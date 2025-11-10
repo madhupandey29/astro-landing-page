@@ -1,0 +1,329 @@
+---
+interface Props {
+  currentSlug: string | null;
+  seoApi?: string;
+  productApi?: string;
+  contactHref?: string;
+  phone?: string;
+}
+const {
+  currentSlug,
+  seoApi = "https://test.amrita-fashions.com/landing/seo",
+  productApi = "https://test.amrita-fashions.com/landing/product",
+  contactHref = "/contact",
+  phone = "+91 99999 99999",
+} = Astro.props as Props;
+
+const norm = (v:any)=>String(v??"").trim().toLowerCase();
+const toId = (v:any)=> typeof v==="string"?v.trim(): (v && v._id ? String(v._id).trim() : "");
+const safeNum = (v:any)=>{ const n=Number(String(v??"").replace(/[^0-9.\-]/g,"")); return Number.isFinite(n)?n:undefined; };
+const joinNames = (arr:any[]) => Array.isArray(arr) ? arr.map((x:any)=> (x?.name ?? x)).filter(Boolean).join(", ") : undefined;
+const pickImg = (p:any)=> String(p?.img || p?.image1 || p?.image2 || "/images/placeholder-800x600.svg");
+
+/* fetch */
+let seoRows:any[] = [];
+let products:any[] = [];
+try{
+  const [sRes, pRes] = await Promise.all([
+    fetch(seoApi, { headers:{Accept:"application/json"} }),
+    fetch(productApi, { headers:{Accept:"application/json"} }),
+  ]);
+  if (sRes.ok){ const j=await sRes.json(); seoRows = Array.isArray(j?.data)? j.data : (Array.isArray(j)? j:[]); }
+  if (pRes.ok){ const j=await pRes.json(); products = Array.isArray(j?.data)? j.data : (Array.isArray(j)? j:[]); }
+}catch{}
+
+/* current SEO row + product */
+const currentSeo = seoRows.find((s:any)=> norm(s?.slug)===norm(currentSlug)) || null;
+let heroProduct:any = null;
+if (currentSeo){
+  const pid = toId(currentSeo.product);
+  heroProduct = products.find((p:any)=> String(p?._id)===pid) || null;
+}
+
+/* view model */
+const titleText = String(currentSeo?.productlocationtitle || heroProduct?.name || "Premium Fabric").trim();
+const tagline   = String(currentSeo?.productlocationtagline || "Denim that Defines Durability and Style").trim();
+const ratingValue = safeNum(currentSeo?.rating_value ?? heroProduct?.rating_value);
+const ratingCount = safeNum(currentSeo?.rating_count ?? heroProduct?.rating_count);
+const leadTimeDays = currentSeo?.leadtime ?? heroProduct?.leadtime;
+
+const specs = {
+  Content: heroProduct?.content?.name ?? heroProduct?.content,
+  Weight: (() => {
+    const gsm = safeNum(heroProduct?.gsm); const oz = safeNum(heroProduct?.oz);
+    if (gsm !== undefined && oz !== undefined) return `${gsm} gsm / ${oz.toFixed(1)} oz`;
+    if (gsm !== undefined) return `${gsm} gsm`;
+    if (oz !== undefined)  return `${oz.toFixed(1)} oz`;
+    return undefined;
+  })(),
+  Width: (() => {
+    const cm = safeNum(heroProduct?.cm); const inch = safeNum(heroProduct?.inch);
+    if (cm !== undefined && inch !== undefined) return `${cm} cm / ${Math.round(inch)} inch`;
+    if (cm !== undefined) return `${cm} cm`;
+    if (inch !== undefined) return `${Math.round(inch)} inch`;
+    return undefined;
+  })(),
+  Finish: heroProduct?.subfinish?.name ?? heroProduct?.subfinish,
+  Design: heroProduct?.design?.name ?? heroProduct?.design,
+  Motif: heroProduct?.motif?.name ?? heroProduct?.motif,
+  Structure: heroProduct?.substructure?.name ?? heroProduct?.substructure,
+  Colors: joinNames(heroProduct?.color) ?? heroProduct?.colors,
+  "Lead time": leadTimeDays ? `${leadTimeDays} days` : undefined,
+};
+
+const heroImg = pickImg(heroProduct);
+const heroAlt = String(heroProduct?.altimg1 || titleText);
+---
+
+<section class="product-hero">
+  <div class="product-container">
+    <!-- LEFT -->
+    <div class="product-content">
+
+
+      <div class="product-header">
+        <div class="product-badge">Featured Product</div>
+        <h1 class="product-title">{titleText}</h1>
+        <p class="product-tagline">{tagline}</p>
+      </div>
+
+      {heroProduct ? (
+        <div class="product-details">
+          <!-- specs styled like the classic single card -->
+          <div class="specs-section">
+            <div class="specs-card">
+              <div class="specs-grid">
+                {Object.entries(specs).map(([k,v]) => v && (
+                  <div class="spec-row">
+                    <span class="spec-name">{k}:</span>
+                    <span class="spec-value">{v}</span>
+                  </div>
+                ))}
+              </div>
+
+              {(ratingValue !== undefined || ratingCount !== undefined) && (
+                <div class="card-meta">
+                  <div class="meta">
+                    <span class="meta-label">Rating:</span>
+                    <span class="stars" aria-label={`${Math.round((ratingValue??0))} out of 5 stars`}>
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <svg viewBox="0 0 20 20" width="18" height="18" class={i < Math.round(ratingValue ?? 0) ? 'star fill' : 'star'} aria-hidden="true">
+                          <path d="M10 1.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8L10 14.5 4.8 17.5l1-5.8L1.5 7.6l5.8-.8L10 1.5z"/>
+                        </svg>
+                      ))}
+                    </span>
+                  </div>
+                  {ratingCount !== undefined && (
+                    <div class="meta">
+                      <span class="meta-label">Reviews:</span>
+                      <span class="meta-val">{ratingCount}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <!-- CTAs with same hover behaviour -->
+          <div class="action-section">
+            <div class="action-buttons">
+              <a class="btn btn-primary" href={`${contactHref}?slug=${encodeURIComponent(String(currentSlug||""))}${heroProduct ? `&product=${encodeURIComponent(heroProduct?.name||"")}&pid=${encodeURIComponent(heroProduct?._id||"")}` : ""}`}>
+                Get Quote Now
+              </a>
+              <a class="btn btn-secondary" href={`tel:${phone?.replace(/[^\d+]/g,"")}`}>
+                Call Now
+              </a>
+              <a class="btn btn-outline" href={`/api/catalogue/${encodeURIComponent(String(currentSlug||"catalog"))}`}>
+                Download Catalog
+              </a>
+            </div>
+
+            <!-- trust chips like the classic row -->
+            <ul class="trust-row">
+              <li><span class="dot" aria-hidden="true"></span>Fast Delivery</li>
+              <li><span class="dot" aria-hidden="true"></span>Quality Assured</li>
+              <li><span class="dot" aria-hidden="true"></span>Expert Support</li>
+            </ul>
+          </div>
+        </div>
+      ) : (
+        <div class="empty-state">
+          <h3>Product Not Found</h3>
+          <p>No product found for this URL.</p>
+        </div>
+      )}
+    </div>
+
+    <!-- RIGHT -->
+    <div class="product-visual">
+      <div class="image-container">
+        <figure class="image-card">
+          <img src={heroImg} alt={heroAlt} loading="eager" decoding="async" class="product-image" />
+          <figcaption class="image-badge">Premium Quality</figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+:root{
+  /* same tokens the index hero relies on */
+  --brand: var(--tp-theme-primary, #2C4C97);
+  --brand-2: var(--tp-theme-secondary, #163b7d);
+  --ink: var(--tp-text-1, #0F2235);
+  --ink-2: var(--tp-text-3, #475569);
+  --bg: #fff;
+  --muted: #e6ebf2;
+  --chip: #0bb67a;
+  --shadow: 0 12px 40px rgba(15,34,53,.12);
+}
+
+/* ===== match index hero container & background ===== */
+.product-hero{
+  background: linear-gradient(180deg,#f7f9fc, #ffffff 40%);
+  padding: clamp(12px, 2vw, 24px) 16px 28px; /* tighter like index */
+}
+.product-container{
+  max-width: 1240px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.05fr .95fr;      /* same as index */
+  gap: clamp(24px, 4vw, 56px);
+  align-items: start;                        /* pin to top like index */
+  padding: 0;                                /* index has no side padding here */
+}
+
+/* ===== breadcrumb (kept) ===== */
+.breadcrumb{ display:flex; align-items:center; gap:8px; margin: 8px 0 18px; color:#64748b; font-size:.9rem; }
+.breadcrumb-link{ color:inherit; text-decoration:none; }
+.breadcrumb-link:hover{ color: var(--brand); }
+.breadcrumb-separator{ color:#cbd5e1; }
+.breadcrumb-current{ color: var(--ink); font-weight:700; }
+
+/* ===== header — mirror index sizes/weights ===== */
+.product-header{ margin-bottom: 12px; }
+.product-badge{
+  display:inline-block; padding:8px 14px; border-radius:999px;
+  background: rgba(44,76,151,.08); border:1px solid rgba(44,76,151,.18); color: var(--brand);
+  font-weight:700; font-size:.9rem; margin-bottom:10px;
+}
+.product-title{
+  font-size: clamp(28px,5vw,44px);
+  line-height:1.15;
+  letter-spacing:-.02em;
+  color: var(--ink);
+  margin:0 0 6px;
+  font-weight:800;                          /* bold like index */
+}
+.product-tagline{
+  margin:0 0 16px;
+  color: var(--ink-2);
+  font-size: clamp(14px,1.8vw,18px);
+}
+
+/* ===== specs card — same grid & look as index ===== */
+.specs-card{
+  background:#fff; border:1px solid var(--muted); border-radius:18px;
+  box-shadow: var(--shadow); padding: clamp(14px,2vw,18px);
+}
+.specs-grid{ display:grid; grid-template-columns: repeat(3, minmax(160px,1fr)); gap: 10px 18px; }
+.spec-row{ display:flex; gap:8px; align-items: baseline; min-height:28px; }
+.spec-name{ color:#526581; font-weight:700; font-size:13px; }
+.spec-value{ color: var(--ink); font-weight:600; font-size:15px; }
+
+.card-meta{ display:flex; gap:28px; border-top:1px dashed var(--muted); margin-top:12px; padding-top:10px; }
+.meta{ display:flex; align-items:center; gap:10px; }
+.meta-label{ color:#526581; font-weight:700; font-size:13px; }
+.meta-val{ color: var(--ink); font-weight:700; }
+.stars{ display:inline-flex; gap:2px; }
+.star{ fill:none; stroke:#F59E0B; stroke-width:1.2; }
+.star.fill{ fill:#F59E0B; }
+
+/* ===== CTAs — copy index styles exactly ===== */
+.action-section{ margin-top:16px; }
+.action-buttons{ display:flex; gap:14%; flex-wrap:wrap; justify-content:center; text-align:center; }
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:10px;
+  padding:12px 18px; border-radius:999px; font-weight:700; font-size:15px;
+  text-decoration:none; border:1.5px solid transparent;
+  transition: transform .18s ease, box-shadow .18s ease, background .18s ease, border-color .18s ease, color .18s ease;
+}
+.btn svg{ flex:0 0 auto; }
+.btn.btn-primary{
+  /* index used a simple “light blue” look; keep close */
+  background: #2C4C97;
+  color:#fff;
+  box-shadow: 0 8px 24px rgba(44,76,151,.20);
+}
+.btn.btn-primary:hover{
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px rgba(44,76,151,.28);
+  filter: brightness(1.05);
+}
+.btn.btn-secondary{
+  background: #000;        /* index had dark fill for secondary */
+  color: #fff;
+  border-color: #000;
+}
+.btn.btn-secondary:hover{
+  transform: translateY(-3px);
+  border-color: var(--brand);
+  color:#fff;
+  box-shadow: 0 8px 24px rgba(15,34,53,.18);
+  background: #0f2235;
+}
+.btn.btn-outline{
+  background:#006400c9;    /* index “outline-mix” look */
+  color:#fff;
+  border-color: transparent;
+}
+.btn.btn-outline:hover{
+  transform: translateY(-3px);
+  border-color: var(--brand);
+  color:#fff;
+  box-shadow: 0 8px 24px rgba(15,34,53,.18);
+  background:#005000;
+}
+.btn:active{ transform: translateY(-1px); }
+
+/* ===== trust row — center like index ===== */
+.trust-row{
+  display:flex; gap:18px; flex-wrap:wrap; list-style:none; padding:0; margin:14px 0 0;
+  color: var(--ink-2); font-weight:700; font-size:14px;
+  justify-content:center; text-align:center;
+}
+.trust-row .dot{ width:10px; height:10px; border-radius:50%; background: var(--chip); margin-right:8px; display:inline-block; }
+
+/* ===== right image — same cap & card look ===== */
+.product-visual{ position: sticky; top: 72px; align-self:start; }
+.image-card{
+  margin:0; width:100%;
+  max-width: clamp(360px, 38vw, 520px);
+  aspect-ratio: 3/4;
+  max-height: 72vh;
+  background: linear-gradient(180deg,#ffffff, #f3f6fb);
+  border: 1px solid var(--muted);
+  border-radius: 28px;
+  box-shadow: 0 30px 70px rgba(22,59,125,.12);
+  overflow:hidden; position: relative;
+}
+.product-image{ width:100%; height:100%; object-fit: cover; display:block; }
+.image-badge{
+  position:absolute; top:12px; left:12px;
+  padding: 8px 12px; background: rgba(255,255,255,.95); border:1px solid var(--muted);
+  border-radius: 12px; font-weight:700; color:#065f46; backdrop-filter: blur(8px);
+}
+
+/* ===== responsive to mirror index ===== */
+@media (max-width: 1024px){
+  .product-container{ grid-template-columns: 1fr; gap:32px; }
+  .product-visual{ position: relative; top:auto; display:flex; justify-content:center; }
+  .image-card{ max-width: 640px; aspect-ratio: 16/10; max-height: 48vh; }
+  .specs-grid{ grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px){
+  .specs-grid{ grid-template-columns: 1fr; }
+  .action-buttons{ flex-direction: column; gap:12px; }
+}
+</style>

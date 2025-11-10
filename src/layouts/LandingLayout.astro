@@ -1,0 +1,29 @@
+---
+import '../styles/theme.css';
+import Navbar from '../components/common/Navbar.astro';
+import Footer from '../components/common/Footer.astro';
+
+const { title = 'Landing', description = '' } = Astro.props;
+---
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" href="/favicon.svg" />
+     <!-- Font Awesome 6 (brands/solid) -->
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+  </head>
+  <!-- 👇 make body the flex wrapper -->
+  <body class="page">
+    <Navbar />
+    <!-- 👇 main will expand to fill remaining space -->
+    <main id="main" class="container-fluid">
+      <slot />
+    </main>
+    <Footer />
+  </body>
+</html>
