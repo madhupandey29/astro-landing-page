@@ -1,0 +1,41 @@
+---
+import LandingLayout from '../layouts/LandingLayout.astro';
+import FashionTestimonial from '../components/sections/Testimonial.astro';
+import FAQ from '../components/sections/FAQSection.astro';
+import ContactSection from '../components/sections/ContactSection.astro';
+import CityProductHero from '../components/sections/CityProductHero.astro';
+import RelatedProductsByLocation from '../components/sections/RelatedProductsByLocation.astro';
+import OverviewSection from '../components/sections/OverviewSection.astro';
+
+/* ✅ Use the Astro component (no client JS) */
+import CommitmentText from '../components/sections/CommitmentText.astro';
+
+export const prerender = false;
+
+const DEFAULT_CITY_CODE = 'ahmedabad';
+const OVERVIEW_IMG = '/images/hero/overview-fabric.webp';
+---
+
+<LandingLayout title="Home – Amrita Fashions" description="B2B fabric supply.">
+  <CityProductHero cityCode={DEFAULT_CITY_CODE} />
+
+  <OverviewSection
+    heading="Leading B2B Fabric Supplier Worldwide"
+    tagline="ISO 9001 Certified • 500+ Global Partners • Ships to 50+ Countries"
+    image={OVERVIEW_IMG}
+    imageAlt="Premium textile manufacturing"
+  >
+    <!-- Injects sanitized HTML fetched on the server -->
+    <CommitmentText slot="extra" />
+  </OverviewSection>
+
+  <RelatedProductsByLocation
+    cityCode={DEFAULT_CITY_CODE}
+    title="Explore Our Fabric Catalog"
+    subtitle="City-specific products curated for your sourcing"
+  />
+
+  <FashionTestimonial/>
+  <FAQ/>
+  <ContactSection/>
+</LandingLayout>

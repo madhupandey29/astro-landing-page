@@ -1,14 +1,18 @@
-// astro.config.mjs (or .ts)
+// astro.config.mjs
 import { defineConfig } from 'astro/config';
 import react from '@astrojs/react';
-import vercel from '@astrojs/vercel/server'; // use '@astrojs/vercel/edge' if you want Edge
+import vercel from '@astrojs/vercel'; // ✅ use package root on Astro v5
 
 export default defineConfig({
   devToolbar: { enabled: false },
-  output: 'hybrid',                 // SSG by default; SSR only where `prerender = false`
+
+  // ✅ Astro v5 "hybrid": server + global prerender
+  output: 'server',
+  prerender: true,                 // prebuild all possible routes as static
   adapter: vercel({
-    // Optional: Incremental Static Regeneration for SSR routes
-    isr: { expiration: 60 * 60 },   // revalidate every 1 hour
+    // Optional: ISR for SSR-only routes
+    isr: { expiration: 60 * 60 },  // revalidate after 1 hour
   }),
+
   integrations: [react()],
 });
