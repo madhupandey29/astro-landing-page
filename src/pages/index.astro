@@ -1,11 +1,13 @@
 ---
 import LandingLayout from '../layouts/LandingLayout.astro';
+import WhatsAppFab from "../components/WhatsAppFab.astro";
 import FashionTestimonial from '../components/sections/Testimonial.astro';
 import FAQ from '../components/sections/FAQSection.astro';
 import ContactSection from '../components/sections/ContactSection.astro';
 import CityProductHero from '../components/sections/CityProductHero.astro';
 import RelatedProductsByLocation from '../components/sections/RelatedProductsByLocation.astro';
 import OverviewSection from '../components/sections/OverviewSection.astro';
+
 
 /* ✅ Use the Astro component (no client JS) */
 import CommitmentText from '../components/sections/CommitmentText.astro';
@@ -28,6 +30,7 @@ const OVERVIEW_IMG = '/images/hero/overview-fabric.webp';
     <!-- Injects sanitized HTML fetched on the server -->
     <CommitmentText slot="extra" />
   </OverviewSection>
+  <WhatsAppFab />
 
   <RelatedProductsByLocation
     cityCode={DEFAULT_CITY_CODE}

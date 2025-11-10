@@ -1,6 +1,8 @@
 ---
 // src/pages/[slug].astro
 import LandingLayout from "../layouts/LandingLayout.astro";
+import WhatsAppFab from "../components/WhatsAppFab.astro";
+
 import FashionTestimonial from "../components/sections/Testimonial.astro";
 import FAQ from "../components/sections/FAQSection.astro";
 import ContactSection from "../components/sections/ContactSection.astro";
@@ -27,6 +29,7 @@ const { slug } = Astro.params;
     title="Explore Our Fabric Catalog"
     subtitle="More options from this location"
   />
+    <WhatsAppFab />
 
   <FashionTestimonial />
   <FAQ />
