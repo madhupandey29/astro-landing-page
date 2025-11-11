@@ -8,7 +8,7 @@ interface Props {
 }
 const {
   officeApi = "https://test.amrita-fashions.com/landing/officeinformation",
-  heading = "Get Your Custom Quote Today",
+  heading = "Get Your Free Sample Today",
   subheading = "Tell us what you need — we'll get back within 1 business day."
 } = Astro.props as Props;
 
@@ -397,7 +397,9 @@ const ADMIN_EMAIL_HEADER = import.meta.env.PUBLIC_ADMIN_EMAIL_HEADER ?? "x-admin
         linear-gradient(180deg, var(--surface-primary) 0%, var(--surface-secondary) 100%);
       position: relative;
       overflow: hidden;
-      padding: clamp(32px, 5vw, 80px) 0;
+     /* top | left&right | bottom */
+padding: clamp(16px, 2.5vw, 32px) 0 clamp(32px, 5vw, 80px);
+
     }
 
     .floating-shapes { position: absolute; inset: 0; pointer-events: none; }

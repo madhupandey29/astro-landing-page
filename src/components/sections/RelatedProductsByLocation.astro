@@ -5,18 +5,33 @@ export interface Props {
   title?: string;
   subtitle?: string;
 }
-const { currentSlug, cityCode, title = 'Explore Our Fabric Catalog', subtitle } = Astro.props;
 
-/* ===== Helpers ===== */
+const {
+  currentSlug,
+  cityCode,
+  title = 'Explore Our Fabric Catalog',
+  subtitle
+} = Astro.props as Props;
+
+/* ================= Helpers ================= */
+
 const norm = (s: any) => String(s ?? '').trim().toLowerCase();
+
 const toId = (v: any) =>
-  typeof v === 'string' ? v.trim() : v?._id ? String(v._id).trim() : '';
-const BASE = (import.meta.env.BASE_URL ?? '/').replace(/\/+$/, '');
+  typeof v === 'string'
+    ? v.trim()
+    : v && v._id
+    ? String(v._id).trim()
+    : '';
+
+const BASE = (import.meta.env.BASE_URL ?? '/').toString().replace(/\/+$/, '');
+
 function cityTokenInSlug(slug: string, city: string) {
   const c = norm(city).replace(/\s+/g, '-');
   const re = new RegExp(`(^|-)${c}(-|$)`, 'i');
   return re.test(String(slug || '').toLowerCase());
 }
+
 async function fetchJson(url: string) {
   try {
     const res = await fetch(url, { headers: { Accept: 'application/json' } });
@@ -27,87 +42,157 @@ async function fetchJson(url: string) {
   }
 }
 
-/* ===== API roots ===== */
-const API_ROOT = (import.meta.env.PUBLIC_API_BASE_URL ?? 'https://test.amrita-fashions.com/landing').replace(/\/+$/, '');
-const SEO_URL = `${API_ROOT}/seo`;
+/* ================= API roots ================= */
+
+const API_ROOT = (import.meta.env.PUBLIC_API_BASE_URL ?? 'https://test.amrita-fashions.com/landing')
+  .toString()
+  .replace(/\/+$/, '');
+
+const SEO_URL     = `${API_ROOT}/seo`;
 const PRODUCT_URL = `${API_ROOT}/product`;
-const LOC_URL = `${API_ROOT}/locations`;
+const LOC_URL     = `${API_ROOT}/locations`;
 
 const [seoJson, prodJson, locJson] = await Promise.all([
   fetchJson(SEO_URL),
   fetchJson(PRODUCT_URL),
-  fetchJson(LOC_URL),
+  fetchJson(LOC_URL)
 ]);
 
-const seos: any[] = Array.isArray(seoJson?.data) ? seoJson.data : [];
-const allProducts: any[] =
-  Array.isArray(prodJson?.data) ? prodJson.data :
-  Array.isArray(prodJson?.data?.products) ? prodJson.data.products :
-  Array.isArray(prodJson) ? prodJson : [];
+const seos: any[] = Array.isArray(seoJson?.data)
+  ? seoJson.data
+  : Array.isArray(seoJson)
+  ? seoJson
+  : [];
 
-const rawLocs = locJson?.data?.locations ?? locJson?.data ?? locJson?.locations ?? [];
+const allProducts: any[] =
+  Array.isArray(prodJson?.data?.products)
+    ? prodJson.data.products
+    : Array.isArray(prodJson?.data)
+    ? prodJson.data
+    : Array.isArray(prodJson)
+    ? prodJson
+    : [];
+
+const rawLocs =
+  locJson?.data?.locations ??
+  locJson?.data ??
+  locJson?.locations ??
+  [];
+
 const locs: any[] = Array.isArray(rawLocs) ? rawLocs : [];
 
-/* Determine target location from slug OR city */
+/* ================= Target location / hero ================= */
+
 let targetLocId = '';
-let targetCode = '';
+let targetCode  = '';
 let heroProductId = '';
 
 if (currentSlug) {
   const row = seos.find((r) => norm(r?.slug) === norm(currentSlug));
+
   if (row) {
-    targetLocId = toId(row.location);
-    targetCode = norm(row.locationCode);
+    // use location _id as primary anchor
+    targetLocId   = toId(row.location);
+    targetCode    = norm(row.locationCode);
     heroProductId = toId(row.product);
   } else {
-    // derive from slug token (fallback)
-    const cityFromSlug = ((): string | null => {
-      const m = String(currentSlug).toLowerCase().match(/-([a-z]+)$/i);
-      return m?.[1] || null;
-    })();
-    if (cityFromSlug) targetCode = cityFromSlug;
+    // fallback: try to infer from slug suffix (e.g. ...-ahmedabad)
+    const m = String(currentSlug).toLowerCase().match(/-([a-z0-9-]+)$/i);
+    if (m?.[1]) targetCode = m[1];
   }
 } else if (cityCode) {
   const loc = locs.find(
-    (l) => norm(l?.slug) === norm(cityCode) || norm(l?.name) === norm(cityCode) || norm(l?.code) === norm(cityCode)
+    (l) =>
+      norm(l?.slug) === norm(cityCode) ||
+      norm(l?.name) === norm(cityCode) ||
+      norm(l?.code) === norm(cityCode)
   );
-  targetLocId = toId(loc);
-  targetCode = norm(loc?.code) || norm(cityCode);
+
+  if (loc) {
+    targetLocId = toId(loc._id || loc.id);
+    targetCode  = norm(loc.code || loc.slug || loc.name || cityCode);
+  } else {
+    targetCode = norm(cityCode);
+  }
 }
 
-/* Same-location predicate */
-function sameLocation(s: any) {
+/* ================= Location predicate ================= */
+/**
+ * "same location" = same location _id.
+ * Only if we DON'T have a reliable targetLocId do we fall back to:
+ * - matching locationCode
+ * - or slug containing city token.
+ */
+function sameLocation(s: any): boolean {
   const locId = toId(s?.location);
-  const code = norm(s?.locationCode);
+  const code  = norm(s?.locationCode);
 
-  if (targetLocId && locId) return targetLocId === locId;
-  if (targetCode && code) return targetCode === code;
+  // 1) strict: both have location id
+  if (targetLocId && locId) {
+    return targetLocId === locId;
+  }
 
-  // last fallback: use slug city token if we have a city hint (from cityCode or slug)
-  const hint = targetCode || cityCode || '';
-  return hint ? cityTokenInSlug(String(s?.slug || ''), hint) : false;
+  // 2) fallback: only if we don't know targetLocId
+  if (!targetLocId && targetCode && code) {
+    return targetCode === code;
+  }
+
+  // 3) last fallback: only if no targetLocId and we have a hint
+  const hint = !targetLocId ? (targetCode || cityCode || '') : '';
+  if (hint) {
+    return cityTokenInSlug(String(s?.slug || ''), hint);
+  }
+
+  return false;
 }
 
-/* Collect product ids & slug per product (prefer same location) */
-const slugByProduct = new Map<string, string>();
-const productIds = new Set<string>();
+/* ================= Collect related product IDs ================= */
 
+const slugByProduct = new Map<string, string>();
+const orderedIds: string[] = [];
+
+// Build mapping + ordered id list for same-location SEO rows
 for (const s of seos) {
-  const pid = toId(s.product);
+  const pid   = toId(s.product);
   const sSlug = String(s?.slug ?? '').trim();
   if (!pid || !sSlug) continue;
 
   if (sameLocation(s)) {
-    productIds.add(pid);
-    slugByProduct.set(pid, sSlug); // override with same-location
+    if (!orderedIds.includes(pid)) {
+      orderedIds.push(pid);
+    }
+    slugByProduct.set(pid, sSlug);
   } else if (!slugByProduct.has(pid)) {
-    slugByProduct.set(pid, sSlug); // fallback slug
+    // keep slug map for non-related items (for /api usage / navigation)
+    slugByProduct.set(pid, sSlug);
   }
 }
 
-const related = allProducts.filter((p) => productIds.has(String(p?._id)));
-/* On slug pages, hide the hero product in the grid */
-const gridProducts = heroProductId ? related.filter((p) => String(p?._id) !== heroProductId) : related;
+// Remove current hero product on slug page
+const filteredIds = orderedIds.filter((id) => id !== heroProductId);
+
+// Materialize from /product API
+const materialized = filteredIds
+  .map((id) => allProducts.find((p) => String(p?._id) === id))
+  .filter(Boolean);
+
+/* ================= Paging ================= */
+
+const PAGE_SIZE       = 3;
+const totalIds        = filteredIds.length;
+const initialCount    = Math.min(PAGE_SIZE, materialized.length);
+const initialProducts = materialized.slice(0, initialCount);
+const showLoadMore    = totalIds > initialCount;
+
+const cardData = (p: any) => {
+  const pid  = String(p?._id ?? '').trim();
+  const slug = slugByProduct.get(pid) || p?.slug || '';
+  const href = slug ? `${BASE}/${encodeURIComponent(slug)}` : '#';
+  const img  = p?.img || p?.image1 || p?.image2 || '/placeholder.svg?height=500&width=600';
+  const name = p?.name || 'Fabric';
+  const desc = (p?.productdescription || '').toString();
+  return { pid, href, img, name, desc };
+};
 ---
 
 <section class="fabric-catalog" id="products">
@@ -117,148 +202,269 @@ const gridProducts = heroProductId ? related.filter((p) => String(p?._id) !== he
       {subtitle && <p class="catalog-subtitle">{subtitle}</p>}
     </div>
 
-    {gridProducts.length === 0 ? (
+    {initialProducts.length === 0 ? (
       <div class="empty-state">
         <div class="empty-icon">📦</div>
         <h3>No Products Available</h3>
         <p>No related products found for this location.</p>
       </div>
     ) : (
-      <div class="products-grid">
-        {gridProducts.map((p) => {
-          const pid = String(p?._id ?? '').trim();
-          const slug = slugByProduct.get(pid) || p?.slug || '';
-          const href = slug ? `${BASE}/${encodeURIComponent(slug)}` : '#';
-          const img = p?.img || p?.image1 || p?.image2 || '/placeholder.svg?height=500&width=600';
-          const name = p?.name || 'Fabric';
-          const desc = (p?.productdescription || '').toString();
-
-          return (
-            <article class="product-card" key={pid}>
-              <div class="card-image">
-                <a href={href} class="image-link">
-                  <img src={img} alt={name} loading="lazy" class="product-image" />
-                  <div class="image-overlay"></div>
-                </a>
-              </div>
-              
-              <div class="card-content">
-                <h3 class="product-name">
-                  <a href={href}>{name}</a>
-                </h3>
-                <p class="product-description">{desc}</p>
-                <div class="card-actions">
-                  <a class="view-details" href={href}>
-                    <span>View Details</span>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <path d="M5 12h14m-7-7l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
+      <>
+        <div class="products-grid" id="related-grid">
+          {initialProducts.map((p) => {
+            const d = cardData(p);
+            return (
+              <article class="product-card" key={d.pid}>
+                <div class="card-image">
+                  <a href={d.href} class="image-link">
+                    <img
+                      src={d.img}
+                      alt={d.name}
+                      loading="lazy"
+                      class="product-image"
+                    />
+                    <div class="image-overlay"></div>
                   </a>
                 </div>
-              </div>
-            </article>
-          );
-        })}
-      </div>
+
+                <div class="card-content">
+                  <h3 class="product-name">
+                    <a href={d.href}>{d.name}</a>
+                  </h3>
+                  <p class="product-description">
+                    {d.desc}
+                  </p>
+                  <div class="card-actions">
+                    <a class="view-details" href={d.href}>
+                      <span>View Details</span>
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M5 12h14m-7-7l7 7-7 7"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
+                    </a>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+
+        {showLoadMore && (
+          <div class="loadmore-wrap">
+            <button
+              id="load-more-related"
+              class="loadmore-btn"
+              type="button"
+            >
+              Load more
+            </button>
+          </div>
+        )}
+
+        {/* Compact meta blob for client-side loader */}
+        <script type="application/json" id="related-meta">
+          {JSON.stringify({
+            ids: filteredIds,
+            pageSize: PAGE_SIZE,
+            initialCount,
+            total: totalIds,
+            slugById: Object.fromEntries(
+              filteredIds.map((id) => [id, slugByProduct.get(id) || ''])
+            ),
+            base: BASE,
+            endpoint: '/api/related-products'
+          })}
+        </script>
+
+        {/* Tiny inline loader script */}
+        <script is:inline>
+          (() => {
+            const metaEl = document.getElementById('related-meta');
+            const btn    = document.getElementById('load-more-related');
+            const grid   = document.getElementById('related-grid');
+            if (!metaEl || !btn || !grid) return;
+
+            const meta   = JSON.parse(metaEl.textContent || '{}');
+            let offset   = Number(meta.initialCount || 0);
+            const limit  = Number(meta.pageSize || 3);
+            const esc = (s) =>
+              String(s ?? '').replace(
+                /[&<>"']/g,
+                (m) =>
+                  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m] || m)
+              );
+
+            async function loadMore() {
+              btn.disabled = true;
+              btn.setAttribute('aria-busy', 'true');
+              btn.textContent = 'Loading...';
+
+              try {
+                const res = await fetch(String(meta.endpoint || '/api/related-products'), {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    ids: meta.ids || [],
+                    offset,
+                    limit
+                  })
+                });
+
+                if (!res.ok) throw new Error('network');
+
+                const payload = await res.json();
+                const items   = payload.items || [];
+                const total   = Number(payload.total ?? meta.total ?? meta.ids?.length ?? 0);
+
+                for (const p of items) {
+                  const pid  = String(p?._id || '');
+                  const sSlug = meta.slugById && meta.slugById[pid];
+                  const href = sSlug
+                    ? `${meta.base || ''}/${encodeURIComponent(sSlug)}`
+                    : '#';
+                  const img  = p?.img || p?.image1 || p?.image2 || '/placeholder.svg?height=500&width=600';
+                  const name = p?.name || 'Fabric';
+                  const desc = (p?.productdescription || '').toString();
+
+                  grid.insertAdjacentHTML(
+                    'beforeend',
+                    `
+                    <article class="product-card">
+                      <div class="card-image">
+                        <a href="${href}" class="image-link">
+                          <img src="${img}" alt="${esc(name)}" loading="lazy" class="product-image" />
+                          <div class="image-overlay"></div>
+                        </a>
+                      </div>
+                      <div class="card-content">
+                        <h3 class="product-name">
+                          <a href="${href}">${esc(name)}</a>
+                        </h3>
+                        <p class="product-description">${esc(desc)}</p>
+                        <div class="card-actions">
+                          <a class="view-details" href="${href}">
+                            <span>View Details</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                              <path d="M5 12h14m-7-7l7 7-7 7"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                              ></path>
+                            </svg>
+                          </a>
+                        </div>
+                      </div>
+                    </article>
+                  `
+                  );
+                }
+
+                offset += items.length;
+
+                const noMore =
+                  offset >= total ||
+                  items.length < limit;
+
+                if (noMore) {
+                  btn.remove();
+                } else {
+                  btn.disabled = false;
+                  btn.removeAttribute('aria-busy');
+                  btn.textContent = 'Load more';
+                }
+              } catch (e) {
+                btn.disabled = false;
+                btn.removeAttribute('aria-busy');
+                btn.textContent = 'Retry';
+              }
+            }
+
+            btn.addEventListener('click', loadMore);
+          })();
+        </script>
+      </>
     )}
   </div>
 </section>
 
 <style>
 .fabric-catalog {
-  padding: 80px 0;
   position: relative;
+  padding: clamp(2.5rem, 4vw, 5rem) 0;
 }
-
 .fabric-catalog::before {
-  content: '';
+  content: "";
   position: absolute;
+  inset-inline: 0;
   top: 0;
-  left: 0;
-  right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent 0%, #e2e8f0 50%, transparent 100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    #e2e8f0 50%,
+    transparent 100%
+  );
 }
-
 .catalog-container {
-  max-width: 1280px;
+  max-width: 80rem;
   margin: 0 auto;
-  padding: 0 24px;
+  padding-inline: 1.25rem;
 }
-
 .catalog-header {
   text-align: center;
-  margin-bottom: 60px;
+  margin-bottom: clamp(1.5rem, 3vw, 3.75rem);
 }
-
 .catalog-title {
+  margin: 0 0 0.75rem;
+  line-height: 1.2;
   font-size: clamp(2rem, 4vw, 3rem);
   font-weight: 800;
   background: linear-gradient(135deg, #0f2235 0%, #2d3748 100%);
   -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
   background-clip: text;
-  margin: 0 0 16px;
-  line-height: 1.2;
+  -webkit-text-fill-color: transparent;
 }
-
 .catalog-subtitle {
-  font-size: 1.25rem;
+  margin: 0 auto;
+  max-width: 37.5rem;
+  font-size: 1.125rem;
   color: #64748b;
-  margin: 0;
   line-height: 1.6;
-  max-width: 600px;
-  margin-left: auto;
-  margin-right: auto;
 }
 
-.empty-state {
-  text-align: center;
-  padding: 80px 20px;
-  background: white;
-  border-radius: 24px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
-  border: 1px solid #f1f5f9;
-}
-
-.empty-icon {
-  font-size: 4rem;
-  margin-bottom: 24px;
-  opacity: 0.7;
-}
-
-.empty-state h3 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #0f2235;
-  margin: 0 0 12px;
-}
-
-.empty-state p {
-  color: #64748b;
-  margin: 0;
-  font-size: 1.1rem;
-}
-
+/* Grid & cards */
 .products-grid {
   display: grid;
-  gap: 32px;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: 2rem;
 }
-
 .product-card {
-  background: white;
-  border-radius: 20px;
-  overflow: hidden;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
-  border: 1px solid #f1f5f9;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
+  background: #ffffff;
+  border-radius: 1.25rem;
+  overflow: hidden;
+  border: 1px solid #f1f5f9;
+  box-shadow: 0 0.25rem 1.5rem rgba(0, 0, 0, 0.08);
+  transition:
+    transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.3s;
 }
-
 .product-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.12);
+  transform: translateY(-0.5rem);
+  box-shadow: 0 1.5rem 3rem rgba(0, 0, 0, 0.12);
   border-color: #e2e8f0;
 }
 
@@ -267,136 +473,160 @@ const gridProducts = heroProductId ? related.filter((p) => String(p?._id) !== he
   overflow: hidden;
   background: #f8fafc;
 }
-
 .image-link {
   display: block;
   position: relative;
-  overflow: hidden;
 }
-
 .product-image {
   width: 100%;
-  height: 280px;
+  height: clamp(14rem, 26vw, 17.5rem);
   object-fit: contain;
   transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
 .product-card:hover .product-image {
   transform: scale(1.05);
 }
-
 .image-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.02) 100%);
-  transition: background 0.3s ease;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0, 0, 0, 0.02) 100%
+  );
 }
 
 .card-content {
-  padding: 24px;
+  padding: 1.5rem;
 }
-
 .product-name {
+  margin: 0 0 0.75rem;
   font-size: 1.25rem;
   font-weight: 700;
   color: #0f2235;
-  margin: 0 0 12px;
   line-height: 1.4;
 }
-
 .product-name a {
   color: inherit;
   text-decoration: none;
-  transition: color 0.2s ease;
 }
-
 .product-name a:hover {
-  color: #2C4C97;
+  color: #2c4c97;
 }
-
 .product-description {
+  margin: 0 0 1.25rem;
   color: #64748b;
   line-height: 1.6;
-  margin: 0 0 20px;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-
 .card-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
+/* CTA button */
 .view-details {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 20px;
-  background: linear-gradient(135deg, #2C4C97 0%, #1e3a8a 100%);
-  color: white;
-  text-decoration: none;
-  border-radius: 12px;
-  font-weight: 600;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.75rem;
+  font-weight: 700;
   font-size: 0.95rem;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 12px rgba(44, 76, 151, 0.3);
+  color: #ffffff;
+  text-decoration: none;
+  background: linear-gradient(135deg, #2c4c97 0%, #1e3a8a 100%);
+  box-shadow: 0 0.125rem 0.75rem rgba(44, 76, 151, 0.3);
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s,
+    background 0.2s;
 }
-
 .view-details:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(44, 76, 151, 0.4);
+  transform: translateY(-0.125rem);
+  box-shadow: 0 0.25rem 1.25rem rgba(44, 76, 151, 0.4);
   background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
 }
-
 .view-details svg {
-  transition: transform 0.3s ease;
+  transition: transform 0.2s ease;
 }
-
 .view-details:hover svg {
-  transform: translateX(4px);
+  transform: translateX(0.25rem);
 }
 
-@media (max-width: 768px) {
-  .fabric-catalog {
-    padding: 60px 0;
-  }
-  
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 5rem 1.25rem;
+  background: #ffffff;
+  border-radius: 1.5rem;
+  border: 1px solid #f1f5f9;
+  box-shadow: 0 0.25rem 1.5rem rgba(0, 0, 0, 0.06);
+}
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  opacity: 0.7;
+}
+.empty-state h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f2235;
+}
+.empty-state p {
+  margin: 0;
+  color: #64748b;
+  font-size: 1.05rem;
+}
+
+/* Load more */
+.loadmore-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 1.5rem;
+}
+.loadmore-btn {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  padding: 0.875rem 1.25rem;
+  border-radius: 0.75rem;
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1;
+  color: #ffffff;
+  background: linear-gradient(135deg, #2c4c97 0%, #1e3a8a 100%);
+  box-shadow: 0 0.125rem 0.75rem rgba(44, 76, 151, 0.3);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    opacity 0.2s ease;
+}
+.loadmore-btn:hover {
+  transform: translateY(-0.125rem);
+  box-shadow: 0 0.25rem 1.25rem rgba(44, 76, 151, 0.4);
+}
+.loadmore-btn[aria-busy='true'] {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+/* Mobile */
+@media (max-width: 48rem) {
   .catalog-container {
-    padding: 0 20px;
+    padding-inline: 1rem;
   }
-  
-  .catalog-header {
-    margin-bottom: 40px;
-  }
-  
   .products-grid {
     grid-template-columns: 1fr;
-    gap: 24px;
+    gap: 1.25rem;
   }
-  
   .product-image {
-    height: 240px;
-  }
-  
-  .card-content {
-    padding: 20px;
-  }
-}
-
-@media (max-width: 480px) {
-  .fabric-catalog {
-    padding: 40px 0;
-  }
-  
-  .catalog-container {
-    padding: 0 16px;
-  }
-  
-  .catalog-subtitle {
-    font-size: 1.1rem;
+    height: 15rem;
   }
 }
 </style>
