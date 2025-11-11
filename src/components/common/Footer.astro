@@ -222,9 +222,7 @@ const year = new Date().getFullYear();
   </div>
 
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Poppins:wght@600;700;800&display=swap');
-
-    /* Map to your theme tokens with graceful fallbacks */
+    /* Map to theme tokens (no font imports; only Hind via --tp-ff-*) */
     .age-footer{
       --BG_TOP:     var(--tp-theme-1, #112338);
       --BG_BOTTOM:  var(--tp-footer-grey-1, #142A42);
@@ -234,7 +232,7 @@ const year = new Date().getFullYear();
       --TEXT_SOFT:  rgba(233,241,250,.78);
       --BORDER_SOFT: rgba(255,255,255,.12);
 
-      font-family:'Plus Jakarta Sans', system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-family: var(--tp-ff-body); /* ✅ Only theme font */
       color: var(--TEXT_MAIN);
     }
     .age-footer__gradient{ background:linear-gradient(180deg,var(--BG_TOP),var(--BG_BOTTOM)); border-top:1px solid var(--BORDER_SOFT); }
@@ -250,9 +248,15 @@ const year = new Date().getFullYear();
     .age-footer__top{ padding:48px 0 26px; }
     .age-footer__bottom{ background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,0)); border-top:1px solid var(--BORDER_SOFT); padding:14px 0 20px; }
 
+    /* Headings use display token; weight 700 (Hind max in your import) */
     .age-title{
-      font-family:'Poppins','Plus Jakarta Sans',system-ui,-apple-system,sans-serif;
-      color:var(--TEXT_MAIN); font-weight:800; font-size:20px; letter-spacing:.2px; margin:0 0 18px; position:relative;
+      font-family: var(--tp-ff-display);
+      color:var(--TEXT_MAIN);
+      font-weight:700;
+      font-size:20px;
+      letter-spacing:.2px;
+      margin:0 0 18px;
+      position:relative;
     }
     .age-title::after{ content:''; position:absolute; left:0; bottom:-8px; width:36px; height:3px; border-radius:3px; background:linear-gradient(90deg,var(--BRAND_GOLD),var(--BRAND_BLUE)); opacity:.95; }
 
@@ -277,7 +281,8 @@ const year = new Date().getFullYear();
     .age-addressSection{ position:relative; padding:10px 0 12px; }
     .age-addressSection:not(.age--noSep)::after{ content:''; position:absolute; left:0; right:0; bottom:0; height:1px; background:var(--BORDER_SOFT); }
     .age-addressTitle{
-      font-family:'Poppins','Plus Jakarta Sans',system-ui; font-weight:800; letter-spacing:.2px; margin:0 0 6px; color:var(--TEXT_MAIN);
+      font-family: var(--tp-ff-display);
+      font-weight:700; letter-spacing:.2px; margin:0 0 6px; color:var(--TEXT_MAIN);
       display:flex; align-items:center; gap:8px;
     }
     .age-addressTitle::before{ content:''; width:8px; height:8px; border-radius:50%; background:linear-gradient(90deg,var(--BRAND_GOLD),var(--BRAND_BLUE)); box-shadow:0 0 0 3px rgba(255,255,255,.06); }
@@ -285,8 +290,13 @@ const year = new Date().getFullYear();
 
     .age-newsMini{ margin:6px 0 12px; }
     .age-newsDesc{ color:var(--TEXT_SOFT); margin:0 0 10px; font-size:18px; line-height:1.65; }
+
+    /* Ensure inputs use theme font */
     .age-pill{ position:relative; display:flex; align-items:center; background:#fff; border:1px solid rgba(0,0,0,.04); border-radius:9999px; height:52px; padding:6px; box-shadow:0 10px 26px rgba(0,0,0,.18); }
-    .age-pill input{ flex:1; height:100%; background:transparent; border:none; color:#0b1220; padding:0 18px; outline:none; font-size:15px; }
+    .age-pill input{
+      flex:1; height:100%; background:transparent; border:none; color:#0b1220; padding:0 18px; outline:none; font-size:15px;
+      font-family: var(--tp-ff-body);
+    }
     .age-pill input::placeholder{ color:#6b7280; }
     .age-pillBtn{ width:40px; height:40px; border-radius:9999px; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; background:var(--BRAND_GOLD); color:#fff; box-shadow:0 10px 22px rgba(214,167,75,.35); }
     .age-arrow{ font-size:24px; line-height:1; transform:translateY(-1px); }
@@ -304,22 +314,13 @@ const year = new Date().getFullYear();
 
     /* SOCIAL: wrap; no scrollbars; same visual weight */
     .age-social{
-      display:flex;
-      gap:8px;
-      margin-top:14px;
-      flex-wrap:wrap;              /* ← wrap instead of scrolling */
-      align-items:center;
-      max-width:100%;
-      overflow:visible;            /* ← hide bars */
-      -ms-overflow-style:none;
-      scrollbar-width:none;
+      display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; align-items:center;
+      max-width:100%; overflow:visible; -ms-overflow-style:none; scrollbar-width:none;
     }
-    .age-social::-webkit-scrollbar{ display:none; } /* WebKit */
+    .age-social::-webkit-scrollbar{ display:none; }
 
     .age-socialBtn{
-      flex:0 0 auto;
-      width:44px; height:44px;
-      border-radius:12px;
+      flex:0 0 auto; width:44px; height:44px; border-radius:12px;
       display:inline-flex; align-items:center; justify-content:center;
       color:var(--TEXT_MAIN);
       border:1px solid var(--BORDER_SOFT);
@@ -328,9 +329,7 @@ const year = new Date().getFullYear();
     }
     .age-socialBtn i,
     .age-socialBtn svg{
-      font-size:20px;
-      width:20px; height:20px;  /* keep SVG equal to FA glyphs */
-      line-height:1;
+      font-size:20px; width:20px; height:20px; line-height:1;
     }
     .age-socialBtn:hover{
       transform:translateY(-3px);
@@ -345,7 +344,7 @@ const year = new Date().getFullYear();
     .age-bottomWrap{ display:flex; flex-direction:column; align-items:center; text-align:center; gap:10px; }
     .age-topbar{ width:72px; height:3px; border-radius:3px; background:linear-gradient(90deg,var(--BRAND_BLUE),var(--BRAND_GOLD)); opacity:.9; }
     .age-copy{ margin:0; color:var(--TEXT_SOFT); font-size:14.5px; letter-spacing:.25px; }
-    .age-copy strong{ color:var(--TEXT_MAIN); font-weight:800; }
+    .age-copy strong{ color:var(--TEXT_MAIN); font-weight:700; }
     .age-dot{ margin:0 10px; color:rgba(255,255,255,.45); }
 
     .age-trust{ display:flex; gap:10px; margin-top:2px; flex-wrap:wrap; justify-content:center; }
