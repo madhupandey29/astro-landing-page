@@ -2,6 +2,8 @@
 import '../styles/theme.css';
 import Navbar from '../components/common/Navbar.astro';
 import Footer from '../components/common/Footer.astro';
+import PerfBooster from "../components/common/PerfBooster.astro";
+
 
 const { title = 'Landing', description = '' } = Astro.props;
 ---
@@ -75,5 +77,6 @@ const { title = 'Landing', description = '' } = Astro.props;
       <slot />
     </main>
     <Footer />
+    <PerfBooster />
   </body>
 </html>

@@ -1,17 +1,19 @@
 // astro.config.mjs
 import { defineConfig } from 'astro/config';
 import react from '@astrojs/react';
-import vercel from '@astrojs/vercel'; // ✅ use package root on Astro v5
+import vercel from '@astrojs/vercel'; // Astro v5: import from package root
 
 export default defineConfig({
   devToolbar: { enabled: false },
 
-  // ✅ Astro v5 "hybrid": server + global prerender
+  // SSR app; pages opt into prerender individually
   output: 'server',
-  prerender: true,                 // prebuild all possible routes as static
+  prerender: false,               // don't globally prerender (prevents static 404/redirect conflicts)
+  trailingSlash: 'ignore',        // no auto slash redirects
+
   adapter: vercel({
-    // Optional: ISR for SSR-only routes
-    isr: { expiration: 60 * 60 },  // revalidate after 1 hour
+    // Optional: ISR for SSR responses
+    isr: { expiration: 60 * 60 }, // 1 hour
   }),
 
   integrations: [react()],
