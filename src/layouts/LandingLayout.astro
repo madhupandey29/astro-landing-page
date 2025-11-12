@@ -4,7 +4,6 @@ import Navbar from '../components/common/Navbar.astro';
 import Footer from '../components/common/Footer.astro';
 import PerfBooster from "../components/common/PerfBooster.astro";
 
-
 const { title = 'Landing', description = '' } = Astro.props;
 ---
 <!doctype html>
@@ -16,61 +15,11 @@ const { title = 'Landing', description = '' } = Astro.props;
     <meta name="description" content={description} />
     <link rel="icon" href="/favicon.svg" />
 
-    <!-- Google Fonts (swap, faster than @import) -->
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Hind:wght@400;600;700&display=swap" rel="stylesheet">
-
-    <!-- Font Awesome 6 CSS -->
-    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
-      crossorigin="anonymous"
-      referrerpolicy="no-referrer"
-    />
-
-    <!-- Preload the exact font that Lighthouse flagged (brands) -->
-    <link
-      rel="preload"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/webfonts/fa-brands-400.woff2"
-      as="font"
-      type="font/woff2"
-      crossorigin
-    />
-
-    <!-- Override @font-face to add font-display (fixes Lighthouse warning) -->
-    <style is:global>
-      /* Brands */
-      @font-face {
-        font-family: "Font Awesome 6 Brands";
-        font-style: normal;
-        font-weight: 400;
-        font-display: swap; /* <-- key fix */
-        src:
-          url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/webfonts/fa-brands-400.woff2") format("woff2"),
-          url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/webfonts/fa-brands-400.woff") format("woff");
-        /* optional metric overrides to reduce tiny shifts */
-        ascent-override: 90%;
-        descent-override: 22%;
-        line-gap-override: 0%;
-        size-adjust: 100%;
-      }
-
-      /* (Optional) If you also use solid icons, keep swap for that family too */
-      @font-face {
-        font-family: "Font Awesome 6 Free";
-        font-style: normal;
-        font-weight: 900;            /* solid weight */
-        font-display: swap;
-        src:
-          url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/webfonts/fa-solid-900.woff2") format("woff2"),
-          url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/webfonts/fa-solid-900.woff") format("woff");
-      }
-    </style>
+    <!-- Fonts are self-hosted via @fontsource in src/styles/theme.css.
+         No Google Fonts or Font Awesome CSS here to avoid render-blocking. -->
   </head>
 
-  <!-- 👇 make body the flex wrapper -->
+  <!-- body is the flex wrapper -->
   <body class="page">
     <Navbar />
     <main id="main" class="container-fluid">
