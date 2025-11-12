@@ -29,7 +29,6 @@ const phone2      = (office?.companyPhone2 ?? "").toString();
 const email       = office?.companyEmail ?? "";
 const address     = office?.companyAddress ?? "";
 const logoUrl     = office?.companyLogoUrl ?? "";
-const wa          = (office?.whatsappNumber ?? "").replace(/\D/g, "");
 const languages   = Array.isArray(office?.companyLanguages) ? office.companyLanguages : [];
 const hours       = office?.companyHours || "";
 const gmapsHref   = address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : null;
@@ -338,25 +337,6 @@ const ADMIN_EMAIL_HEADER = import.meta.env.PUBLIC_ADMIN_EMAIL_HEADER ?? "x-admin
       <button class="popup-button" id="popupClose">Continue</button>
     </div>
   </div>
-
-  <!-- JSON-LD -->
-  <script type="application/ld+json">
-    {JSON.stringify({
-      "@context": "https://schema.org",
-      "@type": "Organization",
-      "name": companyName,
-      "logo": logoUrl || undefined,
-      "contactPoint": [{
-        "@type":"ContactPoint",
-        "telephone": phone1 || undefined,
-        "email": email || undefined,
-        "contactType":"customer support",
-        "areaServed":"IN",
-        "availableLanguage": languages
-      }],
-      "address": address ? { "@type":"PostalAddress", "streetAddress": address } : undefined
-    })}
-  </script>
 
   <style>
     :root {
