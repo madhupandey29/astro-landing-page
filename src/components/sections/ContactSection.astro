@@ -370,7 +370,7 @@ const ADMIN_EMAIL_HEADER = import.meta.env.PUBLIC_ADMIN_EMAIL_HEADER ?? "x-admin
       --surface-tertiary: #f1f5f9;
       
       --text-primary: #0F172A;
-      --text-secondary: #475569;
+      --text-secondary: #475569; /* AA on surface-tertiary */
       --text-muted: #64748B;
       
       --border-light: rgba(15, 34, 53, 0.08);
@@ -397,9 +397,8 @@ const ADMIN_EMAIL_HEADER = import.meta.env.PUBLIC_ADMIN_EMAIL_HEADER ?? "x-admin
         linear-gradient(180deg, var(--surface-primary) 0%, var(--surface-secondary) 100%);
       position: relative;
       overflow: hidden;
-     /* top | left&right | bottom */
-padding: clamp(16px, 2.5vw, 32px) 0 clamp(32px, 5vw, 80px);
-
+      /* top | left&right | bottom */
+      padding: clamp(16px, 2.5vw, 32px) 0 clamp(32px, 5vw, 80px);
     }
 
     .floating-shapes { position: absolute; inset: 0; pointer-events: none; }
@@ -481,14 +480,19 @@ padding: clamp(16px, 2.5vw, 32px) 0 clamp(32px, 5vw, 80px);
     .card-title { font-size: 20px; font-weight: 600; color: var(--text-primary); margin: 0 0 20px; }
 
     /* Progress Tracker */
-    .progress-track { background: var(--surface-tertiary); border-radius: var(--radius-lg); padding: 16px; }
+    .progress-track {
+      background: var(--surface-tertiary);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      color: var(--text-secondary); /* AA contrast on light bg */
+    }
     .steps { display: flex; align-items: center; justify-content: space-between; position: relative; }
     .step-item { display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 1; }
     .step-dot { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; background: var(--surface-primary); border: 2px solid var(--border-medium); color: var(--text-muted); transition: all 0.3s ease; }
     .step-dot.is-active { background: var(--brand-primary); border-color: var(--brand-primary); color: white; box-shadow: 0 4px 12px rgba(44, 76, 151, 0.3); }
     .step-dot.is-completed { background: var(--success); border-color: var(--success); color: white; }
     .step-connector { flex: 1; height: 2px; background: var(--border-medium); margin: 0 8px; position: relative; top: -16px; }
-    .step-label { font-size: 12px; font-weight: 500; color: var(--text-muted); text-align: center; }
+    .step-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); text-align: center; } /* ← changed from --text-muted */
     .step-dot.is-active + .step-label { color: var(--brand-primary); font-weight: 600; }
 
     /* Form Elements */
@@ -633,12 +637,8 @@ padding: clamp(16px, 2.5vw, 32px) 0 clamp(32px, 5vw, 80px);
       .form-actions.between { flex-direction: column; gap: 12px; }
       .btn { justify-content: center; }
       .trust-badges { flex-direction: column; }
-      .popup-title {
-        font-size: 20px;
-      }
-      .popup-message {
-        font-size: 14px;
-      }
+      .popup-title { font-size: 20px; }
+      .popup-message { font-size: 14px; }
     }
   </style>
 

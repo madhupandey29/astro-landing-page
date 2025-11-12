@@ -92,13 +92,15 @@ const stars = Math.max(0, Math.min(5, Math.round(rating || 0)));
         <div class="card-meta">
           <div class="meta">
             <span class="label">Rating:</span>
-            <span class="stars" aria-label={`${stars} out of 5 stars`}>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <svg viewBox="0 0 20 20" width="18" height="18" class={i < stars ? 'star fill' : 'star'} aria-hidden="true">
-                  <path d="M10 1.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8L10 14.5 4.8 17.5l1-5.8L1.5 7.6l5.8-.8L10 1.5z"/>
-                </svg>
-              ))}
-            </span>
+          <span class="stars" aria-hidden="true">
+  {Array.from({ length: 5 }).map((_, i) => (
+    <svg viewBox="0 0 20 20" width="18" height="18" class={i < stars ? 'star fill' : 'star'} aria-hidden="true">
+      <path d="M10 1.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8L10 14.5 4.8 17.5l1-5.8L1.5 7.6l5.8-.8L10 1.5z"/>
+    </svg>
+  ))}
+</span>
+<span class="sr-only">{`${stars} out of 5 stars`}</span>
+
           </div>
           <div class="meta"><span class="label">Reviews:</span><span class="val">{reviews || 0}</span></div>
         </div>
@@ -177,6 +179,12 @@ const stars = Math.max(0, Math.min(5, Math.round(rating || 0)));
   grid-template-columns: 1.05fr .95fr;
   gap: clamp(24px, 4vw, 56px);
   align-items: start;          /* ⬅ content pinned to top */
+}
+.sr-only{
+  position:absolute !important;
+  width:1px;height:1px;margin:-1px;padding:0;border:0;
+  overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);
+  white-space:nowrap;
 }
 
 .left { margin-top: clamp(4px, 1vh, 12px); } /* small optional nudge */
