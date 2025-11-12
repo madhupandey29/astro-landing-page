@@ -1,6 +1,9 @@
 ---
-// One file handles both "/" and "/:slug" with ZERO redirects.
-// "/" shows Ahmedabad content but keeps the URL as "/".
+/**
+ * Handles "/" and "/:slug" with ZERO redirects.
+ * "/" shows Ahmedabad content but keeps the URL as "/".
+ * Also injects FULL meta for the chosen SEO doc directly into <head>.
+ */
 
 import LandingLayout from "../layouts/LandingLayout.astro";
 import WhatsAppFab from "../components/WhatsAppFab.astro";
@@ -9,13 +12,10 @@ import FAQ from "../components/sections/FAQSection.astro";
 import ContactSection from "../components/sections/ContactSection.astro";
 import RelatedProductsByLocation from "../components/sections/RelatedProductsByLocation.astro";
 import OverviewSection from "../components/sections/OverviewSection.astro";
-import StickyContactModal from '../components/StickyContactModal.astro';
+import StickyContactModal from "../components/StickyContactModal.astro";
 
-// City (home-like) UI
 import CommitmentText from "../components/sections/CommitmentText.astro";
 import CityProductHero from "../components/sections/CityProductHero.astro";
-
-// Non-city/product UI
 import ProductHeroBySlug from "../components/sections/ProductHeroBySlug.astro";
 
 export const prerender = false;
@@ -23,8 +23,9 @@ export const prerender = false;
 /* ========= Config ========= */
 const DEFAULT_CITY_CODE = "ahmedabad";
 const OVERVIEW_IMG = "/images/hero/overview-fabric.webp";
+const SEO_API = "https://test.amrita-fashions.com/landing/seo";
 
-// Known city codes (can be replaced by API/DB check)
+// Known city codes (can later come from API)
 const CITY_CODES = [
   "ahmedabad","jaipur","mumbai","delhi","tiruppur","surat","kanpur","kolkata",
   "ludhiana","bhiwandi","ichalkaranji","noida","gurugram","coimbatore",
@@ -33,26 +34,168 @@ const CITY_CODES = [
 ].map((s) => s.toLowerCase());
 
 /* ========= Params ========= */
-// NOTE: because the filename is [[...slug]].astro, Astro.params.slug is undefined at "/"
 const raw = Astro.params.slug;
-const segments = Array.isArray(raw)
-  ? raw.filter(Boolean)
-  : (raw ? String(raw).split("/").filter(Boolean) : []);
-
-const isHomePage = segments.length === 0;               // "/"
-const primary     = (segments[0] ?? "").toLowerCase();  // first segment
+const segments = Array.isArray(raw) ? raw.filter(Boolean) : (raw ? String(raw).split("/").filter(Boolean) : []);
+const isHomePage = segments.length === 0;
+const primary     = (segments[0] ?? "").toLowerCase();
 const isCityPage  = isHomePage ? true : CITY_CODES.includes(primary);
 const currentCity = isHomePage ? DEFAULT_CITY_CODE : primary;
-
-// For product/other pages, use the last segment as slug
 const currentSlug = segments.at(-1) || "";
 
-/* ========= Meta ========= */
-const pageTitle = isCityPage ? "Home – Amrita Fashions" : "Fabric – Amrita Fashions";
-const pageDesc  = isCityPage ? "B2B fabric supply."      : "Premium fabrics for B2B buyers.";
+/* ========= SEO fetch & pick ========= */
+const norm = (s: any) => String(s ?? "").trim().toLowerCase();
+type SeoDoc = Record<string, any>;
+
+let seoList: SeoDoc[] = [];
+try {
+  const res = await fetch(SEO_API, { headers: { "accept": "application/json" } });
+  if (res.ok) {
+    const json = await res.json();
+    seoList = Array.isArray(json?.data) ? json.data : [];
+  }
+} catch (_e) {
+  // ignore; fallbacks below
+}
+
+// pick logic:
+// - if slug present (non-city)  -> match seo.slug === currentSlug (case-insensitive)
+// - if no slug ("/")            -> prefer landingPageProduct containing DEFAULT_CITY_CODE in slug,
+//                                 else first landingPageProduct, else first item
+let seoDoc: SeoDoc | null = null;
+if (!isCityPage && currentSlug) {
+  const target = norm(currentSlug);
+  seoDoc = seoList.find(d => norm(d?.slug) === target) || null;
+} else {
+  const byCity = seoList.find(d => d?.landingPageProduct && norm(d?.slug).includes(norm(DEFAULT_CITY_CODE)));
+  seoDoc = byCity
+    || seoList.find(d => d?.landingPageProduct)
+    || (seoList.length ? seoList[0] : null);
+}
+
+/* ========= Page-level fallbacks ========= */
+const fallbackTitle = isCityPage ? "Home – Amrita Fashions" : "Fabric – Amrita Fashions";
+const fallbackDesc  = isCityPage ? "B2B fabric supply."      : "Premium fabrics for B2B buyers.";
+const pageTitle = seoDoc?.title || fallbackTitle;
+const pageDesc  = seoDoc?.description || seoDoc?.excerpt || fallbackDesc;
+
+// canonical
+const reqUrl = new URL(Astro.request.url);
+const canonical = reqUrl.origin + reqUrl.pathname;
+
+/* ========= Build pass-through meta for ALL remaining SEO fields ========= */
+function s(v: any) {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  try { return JSON.stringify(v); } catch { return String(v); }
+}
+
+const printed = new Set<string>([
+  // basics
+  "title","description","excerpt","keywords","robots","author_name","themeColor",
+  "viewport","formatDetection","googleSiteVerification","msValidate","contentLanguage",
+  "xUaCompatible","x_default",
+  // og/twitter
+  "ogType","ogLocale","ogSiteName","ogDescription",
+  "ogVideoType","ogVideoWidth","ogVideoHeight",
+  "twitterCard","twitterSite","twitterTitle","twitterDescription","twitterPlayer",
+  "twitterPlayerWidth","twitterPlayerHeight",
+  // ids & routing-ish
+  "_id","slug","product","location","createdAt","updatedAt","__v",
+  // JSON-LD blobs (we're not emitting JSON-LD scripts as requested)
+  "BreadcrumbJsonLd","BreadcrumbJsonLdcontext","BreadcrumbJsonLditemListElement","BreadcrumbJsonLdname","BreadcrumbJsonLdtype",
+  "LocalBusinessJsonLd","LocalBusinessJsonLdaddress","LocalBusinessJsonLdaddressaddressCountry","LocalBusinessJsonLdaddressaddressLocality","LocalBusinessJsonLdaddressaddressRegion","LocalBusinessJsonLdaddresspostalCode","LocalBusinessJsonLdaddressstreetAddress","LocalBusinessJsonLdaddresstype","LocalBusinessJsonLdareaserved","LocalBusinessJsonLdcontext","LocalBusinessJsonLdgeo","LocalBusinessJsonLdgeolatitude","LocalBusinessJsonLdgeolongitude","LocalBusinessJsonLdgeotype","LocalBusinessJsonLdname","LocalBusinessJsonLdtelephone","LocalBusinessJsonLdtype",
+  "LogoJsonLd","LogoJsonLdcontext","LogoJsonLdtype",
+  "VideoJsonLd",
+  // extras we already map as custom below
+  "productdescription","description_html","productlocationtitle","productlocationtagline","productlocationdescription1","productlocationdescription2",
+  "popularproduct","topratedproduct","landingPageProduct","shopyProduct",
+  "purchasePrice","salesPrice","sku","productIdentifier","leadtime","rating_count","rating_value",
+]);
+
+const passthroughPairs =
+  seoDoc
+    ? Object.entries(seoDoc).filter(([k, v]) => !printed.has(k) && v !== null && v !== undefined && s(v) !== "")
+    : [];
 ---
 
 <LandingLayout title={pageTitle} description={pageDesc}>
+  <!-- Inject ALL meta/link tags into the <head> -->
+  <Fragment slot="head">
+    <!-- Priority title/description (override layout fallbacks) -->
+    <title>{pageTitle}</title>
+    <meta name="description" content={pageDesc} />
+
+    <!-- Canonical (layout already prints; safe to repeat or omit) -->
+    <link rel="canonical" href={canonical} />
+
+    <!-- Core meta -->
+    {seoDoc?.keywords && <meta name="keywords" content={s(seoDoc.keywords)} />}
+    {seoDoc?.robots && <meta name="robots" content={s(seoDoc.robots)} />}
+    {seoDoc?.author_name && <meta name="author" content={s(seoDoc.author_name)} />}
+    {seoDoc?.themeColor && <meta name="theme-color" content={s(seoDoc.themeColor)} />}
+
+    <!-- Viewport override if provided -->
+    {seoDoc?.viewport && <meta name="viewport" content={s(seoDoc.viewport)} />}
+
+    <!-- Misc SEO/verifications -->
+    {seoDoc?.formatDetection && <meta name="format-detection" content={s(seoDoc.formatDetection)} />}
+    {seoDoc?.googleSiteVerification && <meta name="google-site-verification" content={s(seoDoc.googleSiteVerification)} />}
+    {seoDoc?.msValidate && <meta name="msvalidate.01" content={s(seoDoc.msValidate)} />}
+    {seoDoc?.contentLanguage && <meta http-equiv="content-language" content={s(seoDoc.contentLanguage)} />}
+    {seoDoc?.xUaCompatible && <meta http-equiv="X-UA-Compatible" content={s(seoDoc.xUaCompatible)} />}
+
+    <!-- hreflang x-default if present -->
+    {seoDoc?.x_default && <link rel="alternate" hrefLang="x-default" href={canonical} />}
+
+    <!-- Open Graph -->
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={pageDesc} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:type" content={s(seoDoc?.ogType ?? "website")} />
+    <meta property="og:site_name" content={s(seoDoc?.ogSiteName ?? "Amrita Fashions")} />
+    <meta property="og:locale" content={s(seoDoc?.ogLocale ?? "en_IN")} />
+    {seoDoc?.ogVideoType && <meta property="og:video:type" content={s(seoDoc.ogVideoType)} />}
+    {typeof seoDoc?.ogVideoWidth === "number" && <meta property="og:video:width" content={String(seoDoc.ogVideoWidth)} />}
+    {typeof seoDoc?.ogVideoHeight === "number" && <meta property="og:video:height" content={String(seoDoc.ogVideoHeight)} />}
+
+    <!-- Twitter -->
+    {seoDoc?.twitterCard && <meta name="twitter:card" content={s(seoDoc.twitterCard)} />}
+    {seoDoc?.twitterSite && <meta name="twitter:site" content={s(seoDoc.twitterSite)} />}
+    <meta name="twitter:title" content={s(seoDoc?.twitterTitle ?? pageTitle)} />
+    <meta name="twitter:description" content={s(seoDoc?.twitterDescription ?? pageDesc)} />
+    {seoDoc?.twitterPlayer && <meta name="twitter:player" content={s(seoDoc.twitterPlayer)} />}
+    {typeof seoDoc?.twitterPlayerWidth === "number" && <meta name="twitter:player:width" content={String(seoDoc.twitterPlayerWidth)} />}
+    {typeof seoDoc?.twitterPlayerHeight === "number" && <meta name="twitter:player:height" content={String(seoDoc.twitterPlayerHeight)} />}
+
+    <!-- Product-ish custom fields (as meta so "all data" is present) -->
+    {seoDoc?.productIdentifier && <meta name="af:productIdentifier" content={s(seoDoc.productIdentifier)} />}
+    {seoDoc?.sku && <meta name="af:sku" content={s(seoDoc.sku)} />}
+    {typeof seoDoc?.purchasePrice !== "undefined" && <meta name="af:purchasePrice" content={s(seoDoc.purchasePrice)} />}
+    {typeof seoDoc?.salesPrice !== "undefined" && <meta name="af:salesPrice" content={s(seoDoc.salesPrice)} />}
+    {typeof seoDoc?.leadtime !== "undefined" && <meta name="af:leadtime" content={s(seoDoc.leadtime)} />}
+    {typeof seoDoc?.rating_value !== "undefined" && <meta name="af:rating_value" content={s(seoDoc.rating_value)} />}
+    {typeof seoDoc?.rating_count !== "undefined" && <meta name="af:rating_count" content={s(seoDoc.rating_count)} />}
+
+    {seoDoc?.productlocationtitle && <meta name="af:productlocationtitle" content={s(seoDoc.productlocationtitle)} />}
+    {seoDoc?.productlocationtagline && <meta name="af:productlocationtagline" content={s(seoDoc.productlocationtagline)} />}
+    {seoDoc?.productlocationdescription1 && <meta name="af:productlocationdescription1" content={s(seoDoc.productlocationdescription1)} />}
+    {seoDoc?.productlocationdescription2 && <meta name="af:productlocationdescription2" content={s(seoDoc.productlocationdescription2)} />}
+    {seoDoc?.productdescription && <meta name="af:productdescription" content={s(seoDoc.productdescription)} />}
+    {seoDoc?.description_html && <meta name="af:description_html" content={s(seoDoc.description_html)} />}
+
+    <!-- Popular/top/landing flags -->
+    {typeof seoDoc?.popularproduct !== "undefined" && <meta name="af:popularproduct" content={s(seoDoc.popularproduct)} />}
+    {typeof seoDoc?.topratedproduct !== "undefined" && <meta name="af:topratedproduct" content={s(seoDoc.topratedproduct)} />}
+    {typeof seoDoc?.landingPageProduct !== "undefined" && <meta name="af:landingPageProduct" content={s(seoDoc.landingPageProduct)} />}
+    {typeof seoDoc?.shopyProduct !== "undefined" && <meta name="af:shopyProduct" content={s(seoDoc.shopyProduct)} />}
+
+    <!-- Pass-through EVERYTHING else as <meta name="af:<key>"> -->
+    {passthroughPairs.map(([k, v]) => (
+      <meta name={`af:${k}`} content={s(v)} />
+    ))}
+  </Fragment>
+
   {isCityPage
     ? (<CityProductHero cityCode={currentCity} />)
     : (<ProductHeroBySlug currentSlug={currentSlug} />)
@@ -84,12 +227,13 @@ const pageDesc  = isCityPage ? "B2B fabric supply."      : "Premium fabrics for 
       subtitle="More options from this location"
     />
   )}
- <StickyContactModal
-  side="left"                               
-  targetId="contact"
-  offsetBottom="max(env(safe-area-inset-bottom),16px)"  /* same height as WA */
-  label="Get Your Free Sample Today"
-/>
+
+  <StickyContactModal
+    side="left"
+    targetId="contact"
+    offsetBottom="max(env(safe-area-inset-bottom),16px)"
+    label="Get Your Free Sample Today"
+  />
 
   <WhatsAppFab />
   <FashionTestimonial />

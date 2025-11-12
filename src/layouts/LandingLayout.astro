@@ -1,31 +1,120 @@
 ---
-import '../styles/theme.css';
-import Navbar from '../components/common/Navbar.astro';
-import Footer from '../components/common/Footer.astro';
+/* Theme + component CSS as external files (no inline <style> in source) */
+import themeCssUrl from "../styles/theme.css?url";
+
+/* Component CSS bundles — make sure the files exist and you removed inline styles from components */
+import navbarCssUrl            from "../styles/components/navbar.css?url";
+import footerCssUrl            from "../styles/components/footer.css?url";
+import perfBoosterCssUrl       from "../styles/components/perfbooster.css?url";
+import whatsappFabCssUrl       from "../styles/components/whatsappfab.css?url";
+import testimonialCssUrl       from "../styles/components/testimonial.css?url";
+import faqCssUrl               from "../styles/components/faq.css?url";
+import contactCssUrl           from "../styles/components/contact.css?url";
+import relatedProductsCssUrl   from "../styles/components/related-products.css?url";
+import overviewCssUrl          from "../styles/components/overview.css?url";
+import stickyContactCssUrl     from "../styles/components/sticky-contact-modal.css?url";
+import cityProductHeroCssUrl   from "../styles/components/city-product-hero.css?url";
+import productHeroBySlugCssUrl from "../styles/components/product-hero-by-slug.css?url";
+
+/* Components */
+import Navbar from "../components/common/Navbar.astro";
+import Footer from "../components/common/Footer.astro";
 import PerfBooster from "../components/common/PerfBooster.astro";
 
-const { title = 'Landing', description = '' } = Astro.props;
+/* Page meta */
+const {
+  title = "Landing",
+  description = "",
+} = Astro.props as { title?: string; description?: string };
+
+const reqUrl = new URL(Astro.request.url);
+const canonical = reqUrl.origin + reqUrl.pathname;
 ---
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <!-- Viewport default; pages can override in head slot -->
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Fallback title/description -->
     <title>{title}</title>
     <meta name="description" content={description} />
+
+    <!-- Canonical from live request URL -->
+    <link rel="canonical" href={canonical} />
+
+    <!-- Favicons -->
     <link rel="icon" href="/favicon.svg" />
 
-    <!-- Fonts are self-hosted via @fontsource in src/styles/theme.css.
-         No Google Fonts or Font Awesome CSS here to avoid render-blocking. -->
+    <!-- Non-blocking perf hints -->
+    <link rel="dns-prefetch" href="https://test.amrita-fashions.com" />
+    <link rel="preconnect" href="https://test.amrita-fashions.com" crossorigin />
+    <link rel="dns-prefetch" href="https://res.cloudinary.com" />
+    <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
+    <meta name="color-scheme" content="light dark" />
+
+    <!-- CSS: preload + non-blocking apply. Replace with plain <link rel="stylesheet"> if you prefer render-blocking CSS -->
+    <link rel="preload" as="style" href={themeCssUrl} />
+    <link rel="stylesheet" href={themeCssUrl} media="print" onload="this.media='all'">
+
+    <!-- Component styles (external, so no inline <style> in View Source) -->
+    <link rel="preload" as="style" href={navbarCssUrl} />
+    <link rel="stylesheet" href={navbarCssUrl} media="print" onload="this.media='all'">
+    <link rel="preload" as="style" href={footerCssUrl} />
+    <link rel="stylesheet" href={footerCssUrl} media="print" onload="this.media='all'">
+    <link rel="preload" as="style" href={perfBoosterCssUrl} />
+    <link rel="stylesheet" href={perfBoosterCssUrl} media="print" onload="this.media='all'">
+    <link rel="preload" as="style" href={whatsappFabCssUrl} />
+    <link rel="stylesheet" href={whatsappFabCssUrl} media="print" onload="this.media='all'">
+    <link rel="preload" as="style" href={testimonialCssUrl} />
+    <link rel="stylesheet" href={testimonialCssUrl} media="print" onload="this.media='all'">
+    <link rel="preload" as="style" href={faqCssUrl} />
+    <link rel="stylesheet" href={faqCssUrl} media="print" onload="this.media='all'">
+    <link rel="preload" as="style" href={contactCssUrl} />
+    <link rel="stylesheet" href={contactCssUrl} media="print" onload="this.media='all'">
+    <link rel="preload" as="style" href={relatedProductsCssUrl} />
+    <link rel="stylesheet" href={relatedProductsCssUrl} media="print" onload="this.media='all'">
+    <link rel="preload" as="style" href={overviewCssUrl} />
+    <link rel="stylesheet" href={overviewCssUrl} media="print" onload="this.media='all'">
+    <link rel="preload" as="style" href={stickyContactCssUrl} />
+    <link rel="stylesheet" href={stickyContactCssUrl} media="print" onload="this.media='all'">
+    <link rel="preload" as="style" href={cityProductHeroCssUrl} />
+    <link rel="stylesheet" href={cityProductHeroCssUrl} media="print" onload="this.media='all'">
+    <link rel="preload" as="style" href={productHeroBySlugCssUrl} />
+    <link rel="stylesheet" href={productHeroBySlugCssUrl} media="print" onload="this.media='all'">
+
+    <noscript>
+      <!-- Fallbacks if JS disabled so CSS still applies -->
+      <link rel="stylesheet" href={navbarCssUrl}>
+      <link rel="stylesheet" href={footerCssUrl}>
+      <link rel="stylesheet" href={perfBoosterCssUrl}>
+      <link rel="stylesheet" href={whatsappFabCssUrl}>
+      <link rel="stylesheet" href={testimonialCssUrl}>
+      <link rel="stylesheet" href={faqCssUrl}>
+      <link rel="stylesheet" href={contactCssUrl}>
+      <link rel="stylesheet" href={relatedProductsCssUrl}>
+      <link rel="stylesheet" href={overviewCssUrl}>
+      <link rel="stylesheet" href={stickyContactCssUrl}>
+      <link rel="stylesheet" href={cityProductHeroCssUrl}>
+      <link rel="stylesheet" href={productHeroBySlugCssUrl}>
+    </noscript>
+
+    <!-- URL lock external (won’t show code in View Source) -->
+    <link rel="modulepreload" href="/scripts/url-lock.mjs" />
+    <script type="module" src="/scripts/url-lock.mjs"></script>
+
+    <!-- Pages inject extra meta/link here -->
+    <slot name="head" />
   </head>
 
-  <!-- body is the flex wrapper -->
   <body class="page">
     <Navbar />
     <main id="main" class="container-fluid">
       <slot />
     </main>
     <Footer />
+    <!-- Keep PerfBooster at the very end -->
     <PerfBooster />
   </body>
 </html>
