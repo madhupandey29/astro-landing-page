@@ -83,9 +83,21 @@ const {
     aria-label="Mobile navigation"
   >
     <nav class="mobile-nav" aria-label="Mobile">
+      <div class="mobile-nav-header">
+        <span class="mobile-nav-title">Menu</span>
+        <label
+          for="nav-open"
+          class="close-menu"
+          role="button"
+          aria-label="Close menu"
+          aria-controls="mobile-menu"
+          tabindex="0"
+        >
+          <span class="close-menu-icon" aria-hidden="true"></span>
+        </label>
+      </div>
       <a href="/" class="m-link is-active" aria-current="page">Home</a>
       <a href="#products" class="m-link">Products</a>
-      <a href="#services" class="m-link">Services</a>
       <a href="#testimonials" class="m-link">Testimonials</a>
       <a href="#faq" class="m-link">FAQ</a>
       <a href="#contact" class="m-link">Contact</a>
@@ -101,16 +113,20 @@ const {
     const cb = document.getElementById('nav-open');
     const header = document.querySelector('.site-header');
     const label = document.querySelector('.hamburger');
+    const closeLabel = document.querySelector('.close-menu');
     const navLinks = Array.from(
       document.querySelectorAll('.nav-links .link, .mobile-nav .m-link')
     );
 
     // Order follows actual vertical order on page
-    const sectionIds = ['aboutus', 'products', 'testimonials', 'faq', 'contact', 'services'];
+    const sectionIds = ['aboutus', 'products', 'testimonials', 'faq', 'contact',];
 
     function syncAria() {
       if (label && cb) {
         label.setAttribute('aria-expanded', cb.checked ? 'true' : 'false');
+      }
+      if (closeLabel && cb) {
+        closeLabel.setAttribute('aria-expanded', cb.checked ? 'true' : 'false');
       }
     }
 
@@ -195,7 +211,9 @@ const {
       if (
         target.closest('.mobile-nav a') ||
         target.closest('.m-cta') ||
-        target.closest('.overlay')
+        target.closest('.overlay') ||
+        (target.closest('.mobile-drawer') && !target.closest('.mobile-nav')) ||
+        target.closest('.close-menu')
       ) {
         closeMenu();
       }
@@ -253,20 +271,34 @@ const {
       setBodyOffset();
     });
 
+    // Ensure the close (X) reliably closes without toggling weirdness
+    if (closeLabel) {
+      closeLabel.addEventListener('click', (e) => {
+        e.preventDefault();
+        closeMenu();
+      });
+    }
+
+    closeLabel &&
+      closeLabel.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          closeMenu();
+        }
+      });
+
     window.addEventListener(
       'load',
       () => {
-        if ('scrollRestoration' in history) {
-          history.scrollRestoration = 'manual';
-        }
-        if (!window.location.hash) {
-          window.scrollTo(0, 0);
-        }
+        if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+        // Avoid landing on a deep hash after refresh; always start at top
+        history.replaceState(null, '', '/');
+        window.scrollTo(0, 0);
 
         syncAria();
         setBodyOffset();
         onScroll();
-        updateActiveLink();
+        setActiveFor('home');
       },
       { once: true }
     );
@@ -569,6 +601,57 @@ const {
   flex-direction:column;
   gap:6px;
 }
+.mobile-nav-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding-bottom:6px;
+  margin-bottom:6px;
+  border-bottom:1px solid rgba(17,35,56,.08);
+}
+.mobile-nav-title{
+  font-size:16px;
+  font-weight:700;
+  color:var(--ink);
+}
+.close-menu{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:36px;
+  height:36px;
+  border-radius:50%;
+  cursor:pointer;
+  border:none;
+  background:rgba(44,76,151,.08);
+  transition:background .2s ease, transform .2s ease;
+}
+.close-menu:hover,
+.close-menu:focus-visible{
+  background:rgba(44,76,151,.14);
+  outline:none;
+  transform:translateY(-1px);
+}
+.close-menu-icon{
+  position:relative;
+  width:16px;
+  height:16px;
+  display:block;
+}
+.close-menu-icon::before,
+.close-menu-icon::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  margin:auto;
+  width:16px;
+  height:2px;
+  border-radius:2px;
+  background:var(--ink);
+  transition:background .3s ease;
+}
+.close-menu-icon::before{ transform:rotate(45deg); }
+.close-menu-icon::after{ transform:rotate(-45deg); }
 .m-link{
   display:block;
   padding:14px 18px;
@@ -738,6 +821,23 @@ body:has(#nav-open:checked){
 .theme-dark .mobile-nav{
   background: rgba(15,27,45,.95);
   border-color: rgba(255,255,255,.15);
+}
+.theme-dark .mobile-nav-header{
+  border-color: rgba(255,255,255,.12);
+}
+.theme-dark .mobile-nav-title{
+  color: var(--tp-common-black,#e7edf6);
+}
+.theme-dark .close-menu{
+  background: rgba(44,76,151,.16);
+}
+.theme-dark .close-menu:hover,
+.theme-dark .close-menu:focus-visible{
+  background: rgba(44,76,151,.22);
+}
+.theme-dark .close-menu-icon::before,
+.theme-dark .close-menu-icon::after{
+  background: var(--tp-common-black,#e7edf6);
 }
 .theme-dark .m-link:hover{
   background: rgba(44,76,151,.2);
