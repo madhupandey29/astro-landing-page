@@ -118,8 +118,15 @@ const year = new Date().getFullYear();
               <div class="age-newsMini">
                 <p class="age-newsDesc">Subscribe to our newsletter to get the latest news and offers.</p>
                 <form class="age-pill" action="#" method="post">
-                  <input type="email" required placeholder="Subscribe with us" aria-label="Email address" />
-                  <button type="button" aria-label="Subscribe" class="age-pillBtn">
+<input
+  id="newsletter-email"
+  name="newsletterEmail"
+  type="email"
+  required
+  aria-required="true"
+  autocomplete="email"
+  placeholder="Subscribe with us"
+/>                  <button type="button" aria-label="Subscribe" class="age-pillBtn">
                     <span class="age-arrow">›</span>
                   </button>
                 </form>
