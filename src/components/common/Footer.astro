@@ -115,41 +115,15 @@ const year = new Date().getFullYear();
               <h4 class="age-title">Talk To Us</h4>
 
               <!-- Newsletter (no JS: button is type="button") -->
-      <div class="age-newsMini">
-  <p id="newsletter-desc" class="age-newsDesc">
-    Subscribe to our newsletter to get the latest news and offers.
-  </p>
-
- <form
-  class="age-pill"
-  action="#"
-  method="post"
-  novalidate
->
-  <label for="newsletter-email" class="sr-only">Email address</label>
-
-  <input
-    id="newsletter-email"
-    name="newsletterEmail"
-    type="email"
-    required
-    aria-required="true"
-    autocomplete="email"
-    aria-describedby="newsletter-error"
-    placeholder="your@email.com"
-  />
-
-  <button
-    type="submit"
-    class="age-pillBtn"
-    aria-label="Subscribe to our newsletter"
-  >
-    <span class="age-arrow">›</span>
-  </button>
-</form>
-
-</div>
-
+              <div class="age-newsMini">
+                <p class="age-newsDesc">Subscribe to our newsletter to get the latest news and offers.</p>
+                <form class="age-pill" action="#" method="post">
+                  <input type="email" required placeholder="Subscribe with us" aria-label="Email address" />
+                  <button type="button" aria-label="Subscribe" class="age-pillBtn">
+                    <span class="age-arrow">›</span>
+                  </button>
+                </form>
+              </div>
 
               <!-- Phone / Email -->
               <div class="age-talk">
