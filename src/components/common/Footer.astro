@@ -120,37 +120,34 @@ const year = new Date().getFullYear();
     Subscribe to our newsletter to get the latest news and offers.
   </p>
 
-  <form
-    class="age-pill"
-    action="#"
-    method="post"
-    aria-labelledby="newsletter-label"
-    aria-describedby="newsletter-desc"
-    novalidate
+ <form
+  class="age-pill"
+  action="#"
+  method="post"
+  novalidate
+>
+  <label for="newsletter-email" class="sr-only">Email address</label>
+
+  <input
+    id="newsletter-email"
+    name="newsletterEmail"
+    type="email"
+    required
+    aria-required="true"
+    autocomplete="email"
+    aria-describedby="newsletter-error"
+    placeholder="your@email.com"
+  />
+
+  <button
+    type="submit"
+    class="age-pillBtn"
+    aria-label="Subscribe to our newsletter"
   >
-    <!-- Accessible label (can be visually hidden with .sr-only) -->
-    <label id="newsletter-label" for="newsletter-email" class="sr-only">
-      Email address <span class="sr-only">(required)</span>
-    </label>
+    <span class="age-arrow">›</span>
+  </button>
+</form>
 
-    <input
-      id="newsletter-email"
-      name="newsletterEmail"
-      type="email"
-      required
-      aria-required="true"
-      autocomplete="email"
-      placeholder="your@email.com"
-    />
-
-    <button
-      type="submit"
-      class="age-pillBtn"
-      aria-label="Subscribe to our newsletter"
-    >
-      <span class="age-arrow">›</span>
-    </button>
-  </form>
 </div>
 
 
