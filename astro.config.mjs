@@ -15,6 +15,9 @@ export default defineConfig({
   adapter: vercel({
     isr: { expiration: 60 * 60 },
   }),
-
+ build: {
+    // ✅ safest for your current setup of big per-section <style> blocks
+    inlineStylesheets: 'auto', // 'auto' | 'always' | 'never'
+  },
   integrations: [react()],
 });
