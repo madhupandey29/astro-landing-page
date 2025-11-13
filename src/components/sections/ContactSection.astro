@@ -685,7 +685,13 @@ const ADMIN_EMAIL_HEADER = import.meta.env.PUBLIC_ADMIN_EMAIL_HEADER ?? "x-admin
           d.classList.toggle('is-completed', n < newIndex + 1);
         });
         const first = steps[newIndex].querySelector('input, select, textarea');
-        if (first && first.focus) first.focus({ preventScroll: false });
+        if (first && typeof first.focus === 'function') {
+          try {
+            first.focus({ preventScroll: true });
+          } catch {
+            first.focus();
+          }
+        }
         idx = newIndex;
       }
 

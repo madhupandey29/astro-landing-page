@@ -176,13 +176,11 @@ const materialized = filteredIds
   .map((id) => allProducts.find((p) => String(p?._id) === id))
   .filter(Boolean);
 
-/* ================= Paging ================= */
+/* ================= UI limits & mapping ================= */
 
-const PAGE_SIZE       = 3;
-const totalIds        = filteredIds.length;
-const initialCount    = Math.min(PAGE_SIZE, materialized.length);
-const initialProducts = materialized.slice(0, initialCount);
-const showLoadMore    = totalIds > initialCount;
+const MAX_INITIAL_VISIBLE = 3; // show only 3 in UI; rest via Load more
+const totalProducts       = materialized.length;
+const showLoadMore        = totalProducts > MAX_INITIAL_VISIBLE;
 
 const cardData = (p: any) => {
   const pid  = String(p?._id ?? '').trim();
@@ -202,7 +200,7 @@ const cardData = (p: any) => {
       {subtitle && <p class="catalog-subtitle">{subtitle}</p>}
     </div>
 
-    {initialProducts.length === 0 ? (
+    {materialized.length === 0 ? (
       <div class="empty-state">
         <div class="empty-icon">📦</div>
         <h3>No Products Available</h3>
@@ -211,10 +209,15 @@ const cardData = (p: any) => {
     ) : (
       <>
         <div class="products-grid" id="related-grid">
-          {initialProducts.map((p) => {
+          {materialized.map((p, index) => {
             const d = cardData(p);
+            const isHidden = index >= MAX_INITIAL_VISIBLE;
             return (
-              <article class="product-card" key={d.pid}>
+              <article
+                class={`product-card ${isHidden ? 'hidden-card' : ''}`}
+                data-id={d.pid}
+                style={isHidden ? 'display: none;' : ''}
+              >
                 <div class="card-image">
                   <a href={d.href} class="image-link">
                     <img
@@ -267,133 +270,10 @@ const cardData = (p: any) => {
               class="loadmore-btn"
               type="button"
             >
-              Load more
+              Load More ({materialized.length - MAX_INITIAL_VISIBLE} more)
             </button>
           </div>
         )}
-
-        {/* Compact meta blob for client-side loader */}
-        <script type="application/json" id="related-meta">
-          {JSON.stringify({
-            ids: filteredIds,
-            pageSize: PAGE_SIZE,
-            initialCount,
-            total: totalIds,
-            slugById: Object.fromEntries(
-              filteredIds.map((id) => [id, slugByProduct.get(id) || ''])
-            ),
-            base: BASE,
-            endpoint: '/api/related-products'
-          })}
-        </script>
-
-        {/* Tiny inline loader script */}
-        <script is:inline>
-          (() => {
-            const metaEl = document.getElementById('related-meta');
-            const btn    = document.getElementById('load-more-related');
-            const grid   = document.getElementById('related-grid');
-            if (!metaEl || !btn || !grid) return;
-
-            const meta   = JSON.parse(metaEl.textContent || '{}');
-            let offset   = Number(meta.initialCount || 0);
-            const limit  = Number(meta.pageSize || 3);
-            const esc = (s) =>
-              String(s ?? '').replace(
-                /[&<>"']/g,
-                (m) =>
-                  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m] || m)
-              );
-
-            async function loadMore() {
-              btn.disabled = true;
-              btn.setAttribute('aria-busy', 'true');
-              btn.textContent = 'Loading...';
-
-              try {
-                const res = await fetch(String(meta.endpoint || '/api/related-products'), {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    ids: meta.ids || [],
-                    offset,
-                    limit
-                  })
-                });
-
-                if (!res.ok) throw new Error('network');
-
-                const payload = await res.json();
-                const items   = payload.items || [];
-                const total   = Number(payload.total ?? meta.total ?? meta.ids?.length ?? 0);
-
-                for (const p of items) {
-                  const pid  = String(p?._id || '');
-                  const sSlug = meta.slugById && meta.slugById[pid];
-                  const href = sSlug
-                    ? `${meta.base || ''}/${encodeURIComponent(sSlug)}`
-                    : '#';
-                  const img  = p?.img || p?.image1 || p?.image2 || '/placeholder.svg?height=500&width=600';
-                  const name = p?.name || 'Fabric';
-                  const desc = (p?.productdescription || '').toString();
-
-                  grid.insertAdjacentHTML(
-                    'beforeend',
-                    `
-                    <article class="product-card">
-                      <div class="card-image">
-                        <a href="${href}" class="image-link">
-                          <img src="${img}" alt="${esc(name)}" loading="lazy" class="product-image" />
-                          <div class="image-overlay"></div>
-                        </a>
-                      </div>
-                      <div class="card-content">
-                        <h3 class="product-name">
-                          <a href="${href}">${esc(name)}</a>
-                        </h3>
-                        <p class="product-description">${esc(desc)}</p>
-                        <div class="card-actions">
-                          <a class="view-details" href="${href}">
-                            <span>View Details</span>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                              <path d="M5 12h14m-7-7l7 7-7 7"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                              ></path>
-                            </svg>
-                          </a>
-                        </div>
-                      </div>
-                    </article>
-                  `
-                  );
-                }
-
-                offset += items.length;
-
-                const noMore =
-                  offset >= total ||
-                  items.length < limit;
-
-                if (noMore) {
-                  btn.remove();
-                } else {
-                  btn.disabled = false;
-                  btn.removeAttribute('aria-busy');
-                  btn.textContent = 'Load more';
-                }
-              } catch (e) {
-                btn.disabled = false;
-                btn.removeAttribute('aria-busy');
-                btn.textContent = 'Retry';
-              }
-            }
-
-            btn.addEventListener('click', loadMore);
-          })();
-        </script>
       </>
     )}
   </div>
@@ -446,10 +326,12 @@ const cardData = (p: any) => {
 
 /* Grid & cards */
 .products-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 2rem;
+  justify-content: center;
 }
+
 .product-card {
   position: relative;
   background: #ffffff;
@@ -461,6 +343,11 @@ const cardData = (p: any) => {
     transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
     box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
     border-color 0.3s;
+  flex: 0 0 22rem;            /* ~3 cards per row on desktop */
+  max-width: 22rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 .product-card:hover {
   transform: translateY(-0.5rem);
@@ -480,7 +367,7 @@ const cardData = (p: any) => {
 .product-image {
   width: 100%;
   height: clamp(14rem, 26vw, 17.5rem);
-  object-fit: contain;
+  object-fit: cover;
   transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .product-card:hover .product-image {
@@ -498,13 +385,23 @@ const cardData = (p: any) => {
 
 .card-content {
   padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
 }
+
+/* Title: wrapped & equal height (2 lines) */
 .product-name {
   margin: 0 0 0.75rem;
   font-size: 1.25rem;
   font-weight: 700;
   color: #0f2235;
   line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;   /* clamp long titles */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 3.2em;       /* force 2-line space for equal card height */
 }
 .product-name a {
   color: inherit;
@@ -513,19 +410,23 @@ const cardData = (p: any) => {
 .product-name a:hover {
   color: #2c4c97;
 }
+
+/* Description: also clamped and equal height */
 .product-description {
   margin: 0 0 1.25rem;
   color: #64748b;
   line-height: 1.6;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 3;   /* clamp long descriptions */
   -webkit-box-orient: vertical;
   overflow: hidden;
+  min-height: 4.8em;       /* ~3 lines */
 }
 .card-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  margin-top: auto; /* push CTA to bottom for equal heights */
 }
 
 /* CTA button */
@@ -611,9 +512,9 @@ const cardData = (p: any) => {
   transform: translateY(-0.125rem);
   box-shadow: 0 0.25rem 1.25rem rgba(44, 76, 151, 0.4);
 }
-.loadmore-btn[aria-busy='true'] {
+.loadmore-btn:disabled {
   opacity: 0.7;
-  cursor: progress;
+  cursor: not-allowed;
 }
 
 /* Mobile */
@@ -622,11 +523,60 @@ const cardData = (p: any) => {
     padding-inline: 1rem;
   }
   .products-grid {
-    grid-template-columns: 1fr;
-    gap: 1.25rem;
+    justify-content: center;
+  }
+  .product-card {
+    flex: 0 0 100%;
+    max-width: 100%;
   }
   .product-image {
     height: 15rem;
   }
 }
 </style>
+
+<script>
+// Load More functionality
+document.addEventListener('DOMContentLoaded', function() {
+  const loadMoreBtn = document.getElementById('load-more-related');
+  const productsGrid = document.getElementById('related-grid');
+  
+  if (!loadMoreBtn || !productsGrid) return;
+
+  const hiddenCards = Array.from(productsGrid.querySelectorAll('.product-card[style*="display: none"]'));
+  let currentIndex = 0;
+  const cardsPerLoad = 3; // Show 3 cards at a time
+
+  function showMoreCards() {
+    // Show loading state
+    loadMoreBtn.disabled = true;
+    loadMoreBtn.textContent = 'Loading...';
+
+    // Simulate a small delay for better UX
+    setTimeout(() => {
+      const endIndex = Math.min(currentIndex + cardsPerLoad, hiddenCards.length);
+      
+      for (let i = currentIndex; i < endIndex; i++) {
+        const card = hiddenCards[i];
+        if (card) {
+          card.style.display = ''; // Remove display: none
+          card.classList.remove('hidden-card');
+        }
+      }
+      
+      currentIndex = endIndex;
+      
+      // Update button text or hide if no more cards
+      const remaining = hiddenCards.length - currentIndex;
+      if (remaining <= 0) {
+        loadMoreBtn.style.display = 'none';
+      } else {
+        loadMoreBtn.textContent = `Load More (${remaining} more)`;
+        loadMoreBtn.disabled = false;
+      }
+    }, 300);
+  }
+
+  loadMoreBtn.addEventListener('click', showMoreCards);
+});
+</script>

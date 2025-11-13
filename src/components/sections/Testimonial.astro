@@ -23,27 +23,35 @@ const metrics = [
   { k: 'CLIENT RETENTION', v: '98%'  },
 ];
 
-const pagesBase = ITEMS.length;                 // 1 card per view -> N pages
-const pagesSm   = Math.ceil(ITEMS.length / 2);  // 2 per view
-const pagesLg   = Math.ceil(ITEMS.length / 3);  // 3 per view
+const pagesBase = ITEMS.length;                 // mobile: 1 card per view
+const pagesSm   = Math.ceil(ITEMS.length / 2);  // tablet: 2 per view
+const pagesLg   = Math.ceil(ITEMS.length / 3);  // desktop: 3 per view
 
-function makeRules(prefix: 'b'|'s'|'l', pages: number) {
+// tablet / desktop rules (track translate)
+function makePagedRules(prefix: 's'|'l', pages: number) {
   return Array.from({ length: pages }, (_, i) => `
 #tc-${prefix}-${i+1}:checked ~ .viewport .track{transform:translateX(-${i*100}%);}
 #tc-${prefix}-${i+1}:checked ~ .dots.${prefix} label[for="tc-${prefix}-${i+1}"]{background:var(--gold);transform:scale(1.25);}
 `).join('\n');
 }
 
-/* translate the .track by page-width increments */
+// mobile rules: show ONLY 1 slide (no peek of next)
+const mobileRules = Array.from({ length: pagesBase }, (_, i) => `
+#tc-b-${i+1}:checked ~ .viewport .slides .slide{display:none;}
+#tc-b-${i+1}:checked ~ .viewport .slides .slide:nth-child(${i+1}){display:block;}
+#tc-b-${i+1}:checked ~ .dots.b label[for="tc-b-${i+1}"]{background:var(--gold);transform:scale(1.25);}
+`).join('\n');
+
+/* injected CSS */
 const injected = `
 @media (max-width:639.98px){
-${makeRules('b', pagesBase)}
+${mobileRules}
 }
 @media (min-width:640px) and (max-width:1023.98px){
-${makeRules('s', pagesSm)}
+${makePagedRules('s', pagesSm)}
 }
 @media (min-width:1024px){
-${makeRules('l', pagesLg)}
+${makePagedRules('l', pagesLg)}
 }
 `;
 ---
@@ -58,7 +66,7 @@ ${makeRules('l', pagesLg)}
 
     <div class="slider-wrap">
       <div class="carousel" id="tc">
-        {/* radios (added aria-labels for accessibility) */}
+        {/* radios */}
         {Array.from({length: pagesBase}).map((_, i) => (
           <input
             class="nav-radio base"
@@ -91,14 +99,12 @@ ${makeRules('l', pagesLg)}
         ))}
 
         <div class="viewport">
-          {/* translate this wrapper, not the slides strip */}
           <div class="track">
             <ul class="slides" role="list">
               {ITEMS.map((item) => (
                 <li class="slide">
                   <article class="card">
                     <div class="top">
-                      {/* Stars presented as a single named graphic for SRs */}
                       <div
                         class="stars"
                         role="img"
@@ -263,9 +269,20 @@ ${makeRules('l', pagesLg)}
       list-style:none; margin:0;
       align-items: stretch;
     }
-    @media (max-width:639.98px){ .slides{ gap:0; } }
+    @media (max-width:639.98px){
+      .slides{
+        display:block;   /* stack, then we hide all but selected */
+        gap:0;
+      }
+    }
 
     .slide{ flex: 0 0 100%; min-width:0; }
+    @media (max-width:639.98px){
+      .slide{
+        flex:none;
+        width:100%;
+      }
+    }
     @media (min-width:640px){
       .slide{ flex-basis: calc((100% - var(--gap)) / 2); }
     }
@@ -289,6 +306,6 @@ ${makeRules('l', pagesLg)}
     }
   </style>
 
-  {/* dynamic transform/active-dot CSS */}
+  {/* dynamic transform / active-dot CSS */}
   <style is:global set:html={injected}></style>
 </section>
