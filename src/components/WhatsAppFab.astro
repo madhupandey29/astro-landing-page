@@ -1,472 +1,162 @@
 ---
-/* src/components/FAQSection.astro */
-
 /**
- * Phone + WhatsApp helpers
- * - Uses PUBLIC_WHATSAPP_NUMBER env (same as WhatsAppFab)
- * - Falls back to 9978635079 if not set
+ * Floating WhatsApp FAB for Astro
+ * - No client JS shipped (pure CSS animations + server-built link)
+ * - Honors iOS safe-area insets
+ * - Tooltip on hover (desktop only)
+ * - Ripple + ping dots
+ *
+ * Props (all optional):
+ *   phone    : string  (fallback to import.meta.env.PUBLIC_WHATSAPP_NUMBER)
+ *   message  : string  (prefilled chat text)
+ *   label    : string  (aria-label & title)
+ *   tooltip  : string  (tooltip text on desktop)
  */
+interface Props {
+  phone?: string;
+  message?: string;
+  label?: string;
+  tooltip?: string;
+}
+
+const {
+  phone,
+  message = "Hi! 👋 I'm interested in your fabric products. Could you please provide me with your collection, pricing, and MOQs?",
+  label = "Chat with us on WhatsApp",
+  tooltip = "Chat with us on WhatsApp",
+} = Astro.props as Props;
 
 const RAW_PHONE = String(
-  import.meta.env.PUBLIC_WHATSAPP_NUMBER ?? "9978635079"
+  phone ?? import.meta.env.PUBLIC_WHATSAPP_NUMBER ?? ""
 );
 
-// Digits only for wa.me + tel:
+// wa.me expects digits only (no +, spaces, etc.)
 const DIGITS = RAW_PHONE.replace(/[^\d]/g, "");
-
-// Tel link for direct call
-const telHref = DIGITS ? `tel:+${DIGITS}` : "tel:9978635079";
-
-// WhatsApp link (same logic as WhatsAppFab)
-const CATALOG_MESSAGE =
-  "Hi! 👋 I'm browsing your fabric catalog and would like more details on qualities, pricing, and MOQs.";
-const whatsappHref = `https://wa.me${DIGITS ? `/${DIGITS}` : ""}?text=${encodeURIComponent(
-  CATALOG_MESSAGE
-)}`;
+const encoded = encodeURIComponent(message);
+const href = `https://wa.me${DIGITS ? `/${DIGITS}` : ""}?text=${encoded}`;
 ---
 
-<section id="faq" class="faq-section">
-  <div class="container">
-    <div class="faq-layout">
-      <!-- Left: Intro + CTA -->
-      <div class="faq-intro">
-        <p class="faq-eyebrow">FAQ • Support for your sourcing team</p>
-        <h2 class="faq-title">Clear answers, zero friction.</h2>
-        <p class="faq-text">
-          A quick snapshot of how we handle MOQ, sampling, timelines, and quality
-          so your team can move faster with confidence.
-        </p>
-        <ul class="faq-points">
-          <li>Realistic MOQs for brands &amp; exporters</li>
-          <li>Structured QA + lab testing support</li>
-          <li>Custom fabric development on request</li>
-        </ul>
+<!-- Wrapper -->
+<div class="wa-wrap">
+  <!-- Tooltip (desktop only via CSS) -->
+  <div class="wa-tip" role="tooltip" id="wa-tip">{tooltip}</div>
 
-        <div class="faq-cta-inline">
-          <!-- CALL BUTTON: opens dialer / call option -->
-          <a href={telHref} class="btn" aria-label="Call a fabric specialist">
-            Talk to a Fabric Specialist
-          </a>
+  <!-- Button (anchor = no JS needed) -->
+  <a
+    href={href}
+    target="_blank"
+    rel="noopener noreferrer"
+    class="wa-fab"
+    aria-label={label}
+    title={label}
+  >
+    <span class="sr-only">{label}</span>
 
-          <!-- WHATSAPP BUTTON: same logic as WhatsApp FAB -->
-          <a
-            href={whatsappHref}
-            class="btn secondary"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Chat on WhatsApp to browse fabric catalog"
-          >
-            Browse Fabric Catalog
-          </a>
-        </div>
-      </div>
+    <!-- Ripple -->
+    <span class="wa-ripple" aria-hidden="true"></span>
 
-      <!-- Right: FAQ List -->
-      <div class="faq-list">
-        <!-- FAQ Item 1 -->
-        <div class="faq-item" data-faq-item>
-          <button class="faq-question" type="button" aria-expanded="false">
-            <span>What is your minimum order quantity for bulk fabric orders?</span>
-            <span class="faq-icon-wrap">
-              <svg class="faq-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M3 8H13M8 3V13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-            </span>
-          </button>
-          <div class="faq-answer" hidden>
-            <p>
-              It depends on the fabric. Standard qualities usually start from
-              around 500 yards, while some custom or specialty developments can
-              begin at ~300 yards. Share your target and we'll confirm the most
-              practical MOQ.
-            </p>
-          </div>
-        </div>
+    <!-- Icon -->
+    <svg class="wa-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path fill="currentColor" d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.74-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884"/>
+    </svg>
 
-        <!-- FAQ Item 2 -->
-        <div class="faq-item" data-faq-item>
-          <button class="faq-question" type="button" aria-expanded="false">
-            <span>Do you provide fabric samples before placing bulk orders?</span>
-            <span class="faq-icon-wrap">
-              <svg class="faq-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M3 8H13M8 3V13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-            </span>
-          </button>
-          <div class="faq-answer" hidden>
-            <p>
-              Yes. We share curated swatches so your team can check color, feel,
-              and construction. Standard samples are often complimentary; custom
-              developments may be adjusted against your first bulk order.
-            </p>
-          </div>
-        </div>
-
-        <!-- FAQ Item 3 -->
-        <div class="faq-item" data-faq-item>
-          <button class="faq-question" type="button" aria-expanded="false">
-            <span>What are your payment terms for B2B fabric orders?</span>
-            <span class="faq-icon-wrap">
-              <svg class="faq-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M3 8H13M8 3V13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-            </span>
-          </button>
-          <div class="faq-answer" hidden>
-            <p>
-              Typically 50% advance and 50% before dispatch for new buyers.
-              Long-term partners may qualify for structured credit terms after
-              review.
-            </p>
-          </div>
-        </div>
-
-        <!-- FAQ Item 4 -->
-        <div class="faq-item" data-faq-item>
-          <button class="faq-question" type="button" aria-expanded="false">
-            <span>How do you ensure consistent quality across large orders?</span>
-            <span class="faq-icon-wrap">
-              <svg class="faq-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M3 8H13M8 3V13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-            </span>
-          </button>
-          <div class="faq-answer" hidden>
-            <p>
-              Each lot passes through yarn checks, on-loom inspection, finishing
-              control, and lab tests (shrinkage, GSM, color fastness, etc.).
-              Reports or third-party inspection can be arranged on request.
-            </p>
-          </div>
-        </div>
-
-        <!-- FAQ Item 5 -->
-        <div class="faq-item" data-faq-item>
-          <button class="faq-question" type="button" aria-expanded="false">
-            <span>What is your typical lead time from confirmation to dispatch?</span>
-            <span class="faq-icon-wrap">
-              <svg class="faq-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M3 8H13M8 3V13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-            </span>
-          </button>
-          <div class="faq-answer" hidden>
-            <p>
-              Standard repeats: approx. 4–6 weeks. New developments or complex
-              finishes: 6–8 weeks. Faster slots can be discussed for priority
-              programs.
-            </p>
-          </div>
-        </div>
-
-        <!-- FAQ Item 6 -->
-        <div class="faq-item" data-faq-item>
-          <button class="faq-question" type="button" aria-expanded="false">
-            <span>Do you support custom fabric development?</span>
-            <span class="faq-icon-wrap">
-              <svg class="faq-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M3 8H13M8 3V13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-            </span>
-          </button>
-          <div class="faq-answer" hidden>
-            <p>
-              Yes. We work with your tech pack or moodboard on count, GSM,
-              weave/knit, finish, and performance. Our team suggests the most
-              production-friendly options to hit your cost and quality targets.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
+    <!-- Notification dots -->
+    <span class="wa-dot wa-dot-ping" aria-hidden="true"></span>
+    <span class="wa-dot" aria-hidden="true"></span>
+  </a>
+</div>
 
 <style>
-  .faq-section {
-    padding: 80px 0;
-    background: var(--tp-grey-1);
+  .wa-wrap{
+    position:fixed;
+    right: max(env(safe-area-inset-right), 16px);
+    bottom:max(env(safe-area-inset-bottom),16px);
+    z-index:60;
+    opacity:0;
+    transform: translateY(12px);
+    animation: wa-in .6s ease-out .6s forwards;
+  }
+  @keyframes wa-in{to{opacity:1; transform:none}}
+
+  .wa-fab{
+    position:relative;
+    display:inline-flex; align-items:center; justify-content:center;
+    width:56px; height:56px; border-radius:999px;
+    color:#fff;
+    background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+    box-shadow: 0 10px 30px rgba(34,197,94,0.45);
+    text-decoration:none;
+    transition: transform .25s ease, box-shadow .25s ease, outline-color .2s;
+    outline: none;
+  }
+  .wa-fab:hover{ transform: scale(1.08) }
+  .wa-fab:focus-visible{
+    outline: 2px solid rgba(255,255,255,.6);
+    outline-offset: 2px;
   }
 
-  .faq-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
-    gap: 60px;
-    align-items: flex-start;
+  /* Bigger on md+ */
+  @media (min-width: 768px){
+    .wa-fab{ width:64px; height:64px }
+    .wa-ico{ width:28px; height:28px }
   }
 
-  /* Intro column */
-  .faq-intro {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
+  .wa-ico{ width:24px; height:24px; z-index:10; position:relative }
+
+  /* Ripple */
+  .wa-ripple{
+    position:absolute; inset:0; border-radius:inherit;
+    background:#fff; opacity:0; transform: scale(1);
+    transition: opacity .3s ease, transform .3s ease;
+    pointer-events:none;
+  }
+  .wa-fab:hover .wa-ripple{ opacity:.2; transform: scale(1.5) }
+
+  /* Dots + ping */
+  .wa-dot{
+    position:absolute; top:-6px; right:-6px;
+    width:14px; height:14px; border-radius:999px; background:#ef4444;
+  }
+  .wa-dot-ping{
+    animation: wa-ping 1.2s cubic-bezier(0,0,.2,1) infinite;
+    opacity:.65;
+  }
+  @keyframes wa-ping{
+    0%{ transform: scale(1); opacity:.65 }
+    80%{ transform: scale(2); opacity:0 }
+    100%{ transform: scale(2); opacity:0 }
   }
 
-  .faq-eyebrow {
-    font-size: 0.8rem;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: var(--tp-theme-primary);
-    font-weight: 600;
-    display: inline-block;
-    padding: 6px 12px;
-    background: rgba(44, 76, 151, 0.08);
-    border-radius: 20px;
-    width: fit-content;
-    margin: 0;
+  /* Tooltip (visible only on hover-capable screens) */
+  .wa-tip{
+    position:absolute; right:0; bottom:100%;
+    margin-bottom:12px;
+    background:#111827; color:#fff;
+    font-size:13px; line-height:1; padding:8px 10px;
+    border-radius:10px; box-shadow: 0 8px 24px rgba(0,0,0,.25);
+    white-space:nowrap;
+    opacity:0; transform: translateY(6px);
+    pointer-events:none;
+  }
+  .wa-tip::after{
+    content:""; position:absolute; right:18px; top:100%;
+    width:10px; height:10px; background:#111827; transform: rotate(45deg);
+  }
+  @media (hover:hover) and (min-width:640px){
+    .wa-wrap:hover .wa-tip{ opacity:1; transform: translateY(0); }
   }
 
-  .faq-title {
-    font-size: clamp(1.9rem, 4vw, 2.2rem);
-    line-height: 1.2;
-    color: var(--tp-text-1);
-    margin: 0;
-    font-family: var(--tp-ff-display);
-    font-weight: 700;
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce){
+    .wa-wrap{ animation: none; opacity:1; transform:none }
+    .wa-fab{ transition: none }
+    .wa-fab:hover{ transform:none }
+    .wa-dot-ping{ animation: none }
   }
 
-  .faq-text {
-    margin: 0;
-    font-size: 1.05rem;
-    line-height: 1.7;
-    color: var(--tp-text-2);
-    max-width: 90%;
-  }
-
-  .faq-points {
-    margin: 8px 0 0;
-    padding-left: 0;
-    display: grid;
-    gap: 12px;
-    font-size: 0.95rem;
-    color: var(--tp-text-2);
-  }
-
-  .faq-points li {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    list-style: none;
-  }
-
-  .faq-points li::before {
-    content: "";
-    display: block;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--tp-theme-secondary);
-  }
-
-  .faq-cta-inline {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-top: 20px;
-  }
-
-  .faq-cta-inline .btn {
-    padding: 12px 24px;
-    font-size: 0.95rem;
-    border-radius: 12px;
-    font-weight: 600;
-    transition: all 0.3s ease;
-  }
-
-  .faq-cta-inline .btn.secondary {
-    background: transparent;
-    color: var(--tp-theme-primary);
-    border: 1.5px solid rgba(44, 76, 151, 0.3);
-  }
-
-  .faq-cta-inline .btn.secondary:hover {
-    border-color: var(--tp-theme-primary);
-    background: rgba(44, 76, 151, 0.05);
-    transform: translateY(-1px);
-  }
-
-  /* FAQ list column */
-  .faq-list {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  .faq-item {
-    border-radius: var(--radius-md);
-    background: var(--tp-common-white);
-    border: 1px solid var(--tp-grey-2);
-    box-shadow: var(--shadow-1);
-    padding: 0;
-    transition: all 0.3s ease;
-    overflow: hidden;
-    position: relative;
-  }
-
-  .faq-item::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 4px;
-    height: 0;
-    background: var(--tp-theme-primary);
-    transition: height 0.3s ease;
-  }
-
-  .faq-item:hover {
-    box-shadow: 0 8px 24px rgba(17, 35, 56, 0.12);
-    border-color: rgba(44, 76, 151, 0.2);
-  }
-
-  .faq-item.active {
-    border-color: var(--tp-theme-primary);
-    box-shadow: 0 8px 28px rgba(44, 76, 151, 0.15);
-  }
-
-  .faq-item.active::before {
-    height: 100%;
-  }
-
-  .faq-question {
-    width: 100%;
-    padding: 20px 24px 20px 28px;
-    cursor: pointer;
-    display: flex;
-    gap: 16px;
-    align-items: center;
-    justify-content: space-between;
-    font-size: 1.05rem;
-    font-weight: 600;
-    color: var(--tp-text-1);
-    background: none;
-    border: none;
-    text-align: left;
-    font-family: inherit;
-    transition: all 0.3s ease;
-  }
-
-  .faq-question:hover {
-    color: var(--tp-theme-primary);
-  }
-
-  .faq-question span:first-child {
-    flex: 1;
-  }
-
-  .faq-icon-wrap {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-    background: rgba(44, 76, 151, 0.08);
-    color: var(--tp-theme-primary);
-    flex-shrink: 0;
-    transition: all 0.3s ease;
-  }
-
-  .faq-item.active .faq-icon-wrap {
-    background: var(--tp-theme-primary);
-    color: var(--tp-common-white);
-  }
-
-  .faq-icon {
-    transition: transform 0.3s ease;
-  }
-
-  .faq-item.active .faq-icon {
-    transform: rotate(45deg);
-  }
-
-  .faq-answer {
-    padding: 0 28px;
-    max-height: 0;
-    overflow: hidden;
-    font-size: 0.95rem;
-    line-height: 1.7;
-    color: var(--tp-text-2);
-    transition: all 0.4s ease;
-  }
-
-  .faq-item.active .faq-answer {
-    padding: 0 28px 24px;
-    max-height: 500px;
-  }
-
-  .faq-answer p {
-    margin: 0;
-  }
-
-  /* Responsive */
-  @media (max-width: 900px) {
-    .faq-layout {
-      grid-template-columns: 1fr;
-      gap: 40px;
-    }
-    .faq-section {
-      padding: 60px 0;
-    }
-    .faq-text {
-      max-width: 100%;
-    }
-  }
-
-  @media (max-width: 540px) {
-    .faq-section {
-      padding: 40px 0;
-    }
-    .faq-question {
-      padding: 16px 20px 16px 24px;
-      font-size: 1rem;
-    }
-    .faq-item.active .faq-answer {
-      padding: 0 24px 20px;
-    }
-    .faq-cta-inline {
-      flex-direction: column;
-    }
-    .faq-cta-inline .btn {
-      width: 100%;
-      text-align: center;
-    }
+  /* Visually hidden */
+  .sr-only{
+    position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+    overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
   }
 </style>
-
-<script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const faqItems = document.querySelectorAll('[data-faq-item]');
-
-    faqItems.forEach((item) => {
-      const question = item.querySelector('.faq-question');
-      const answer = item.querySelector('.faq-answer');
-
-      question.addEventListener('click', () => {
-        const isActive = item.classList.contains('active');
-
-        // Close all FAQ items
-        faqItems.forEach((otherItem) => {
-          if (otherItem !== item) {
-            otherItem.classList.remove('active');
-            const otherAnswer = otherItem.querySelector('.faq-answer');
-            const otherButton = otherItem.querySelector('.faq-question');
-            otherAnswer.hidden = true;
-            otherButton.setAttribute('aria-expanded', 'false');
-          }
-        });
-
-        // Toggle current item
-        if (!isActive) {
-          item.classList.add('active');
-          answer.hidden = false;
-          question.setAttribute('aria-expanded', 'true');
-        } else {
-          item.classList.remove('active');
-          answer.hidden = true;
-          question.setAttribute('aria-expanded', 'false');
-        }
-      });
-    });
-  });
-</script>
