@@ -115,24 +115,44 @@ const year = new Date().getFullYear();
               <h4 class="age-title">Talk To Us</h4>
 
               <!-- Newsletter (no JS: button is type="button") -->
-              <div class="age-newsMini">
-                <p class="age-newsDesc">Subscribe to our newsletter to get the latest news and offers.</p>
-       <form class="age-pill" action="#" method="post">
-  <input
-    id="newsletter-email"
-    name="newsletterEmail"
-    type="email"
-    required
-    aria-required="true"
-    autocomplete="email"
-    placeholder="Subscribe with us"
-  />
-  <button type="button" aria-label="Subscribe" class="age-pillBtn">
-    <span class="age-arrow">›</span>
-  </button>
-</form>
+      <div class="age-newsMini">
+  <p id="newsletter-desc" class="age-newsDesc">
+    Subscribe to our newsletter to get the latest news and offers.
+  </p>
 
-              </div>
+  <form
+    class="age-pill"
+    action="#"
+    method="post"
+    aria-labelledby="newsletter-label"
+    aria-describedby="newsletter-desc"
+    novalidate
+  >
+    <!-- Accessible label (can be visually hidden with .sr-only) -->
+    <label id="newsletter-label" for="newsletter-email" class="sr-only">
+      Email address <span class="sr-only">(required)</span>
+    </label>
+
+    <input
+      id="newsletter-email"
+      name="newsletterEmail"
+      type="email"
+      required
+      aria-required="true"
+      autocomplete="email"
+      placeholder="your@email.com"
+    />
+
+    <button
+      type="submit"
+      class="age-pillBtn"
+      aria-label="Subscribe to our newsletter"
+    >
+      <span class="age-arrow">›</span>
+    </button>
+  </form>
+</div>
+
 
               <!-- Phone / Email -->
               <div class="age-talk">
