@@ -44,11 +44,16 @@ const canonical = reqUrl.origin + reqUrl.pathname;
     <slot name="head" />
   </head>
 
-  <body class="page">
+  <body id="top" class="page">
     <Navbar />
     <main id="main" class="container-fluid">
       <slot />
     </main>
+    <a href="#top" class="scroll-top" aria-label="Back to top">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 5l7 7-1.41 1.41L13 9.83V20h-2V9.83l-4.59 4.58L5 12z" fill="currentColor" />
+      </svg>
+    </a>
     <Footer />
     <!-- Keep PerfBooster at the very end so it can't race the URL lock -->
     <PerfBooster />
