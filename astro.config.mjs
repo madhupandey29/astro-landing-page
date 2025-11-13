@@ -17,7 +17,7 @@ export default defineConfig({
   }),
  build: {
     // ✅ safest for your current setup of big per-section <style> blocks
-    inlineStylesheets: 'auto', // 'auto' | 'always' | 'never'
+    inlineStylesheets: 'always', // 'auto' | 'always' | 'never'
   },
   integrations: [react()],
 });
