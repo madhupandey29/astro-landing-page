@@ -22,6 +22,8 @@
   },
   "devDependencies": {
     "@astrojs/sitemap": "^3.6.0",
-    "@astrojs/vercel": "^9.0.0"
+    "@astrojs/vercel": "^9.0.0",
+    "@fullhuman/postcss-purgecss": "^7.0.2",
+    "postcss": "^8.5.6"
   }
 }

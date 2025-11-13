@@ -6,6 +6,10 @@ import vercel from '@astrojs/vercel'; // Astro v5: import from package root
 export default defineConfig({
   devToolbar: { enabled: false },
 
+  css: {
+    postcss: true,
+  },
+
   // SSR app; pages opt into prerender individually
   output: 'server',
   prerender: false,               // don't globally prerender (prevents static 404/redirect conflicts)
