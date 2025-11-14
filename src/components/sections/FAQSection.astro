@@ -1,5 +1,21 @@
 ---
 // src/components/FAQSection.astro
+
+// Phone / WhatsApp config
+const RAW_PHONE = String(
+  import.meta.env.PUBLIC_WHATSAPP_NUMBER || "919925155141" // +91 99251 55141
+);
+
+// Keep only digits
+const DIGITS = RAW_PHONE.replace(/[^\d]/g, "");
+
+// Tel link for direct call
+const telHref = DIGITS ? `tel:+${DIGITS}` : "tel:+919925155141";
+
+// WhatsApp link for catalog enquiry (no preset message, just open chat)
+const whatsappHref = DIGITS
+  ? `https://wa.me/${DIGITS}`
+  : "https://wa.me/919925155141";
 ---
 
 <section id="faq" class="faq-section">
@@ -20,8 +36,20 @@
         </ul>
 
         <div class="faq-cta-inline">
-          <a href="/contact" class="btn">Talk to a Fabric Specialist</a>
-          <a href="/catalog" class="btn secondary">Browse Fabric Catalog</a>
+          <!-- CALL: Talk to a Fabric Specialist -->
+          <a href={telHref} class="btn">
+            Talk to a Fabric Specialist
+          </a>
+
+          <!-- WHATSAPP: Browse Fabric Catalog -->
+          <a
+            href={whatsappHref}
+            class="btn secondary"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Browse Fabric Catalog
+          </a>
         </div>
       </div>
 
@@ -428,7 +456,7 @@
         } else {
           item.classList.remove('active');
           answer.hidden = true;
-          question.setAttribute('aria-expanded', 'false');
+          question.setAttribute('aria-expanded', 'false'); 
         }
       });
     });
