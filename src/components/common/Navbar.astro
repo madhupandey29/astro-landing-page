@@ -222,7 +222,10 @@ const {
         closeMenu();
       }
 
-      const navAnchor = target.closest('.nav-links .link, .mobile-nav .m-link');
+      const navAnchor = target.closest(
+  '.nav-links .link, .mobile-nav .m-link, .age-footer .age-navLink'
+);
+
       if (!navAnchor) return;
 
       const href = navAnchor.getAttribute('href') || '';
