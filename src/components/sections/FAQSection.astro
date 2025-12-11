@@ -1,0 +1,600 @@
+---
+/* src/components/FAQSection.astro */
+
+// Phone / WhatsApp config
+const RAW_PHONE = String(
+  import.meta.env.PUBLIC_WHATSAPP_NUMBER || "919925155141" // +91 99251 55141
+);
+
+// Keep only digits
+const DIGITS = RAW_PHONE.replace(/[^\d]/g, "");
+
+// Tel link for direct call
+const telHref = DIGITS ? `tel:+${DIGITS}` : "tel:+919925155141";
+
+// WhatsApp link for catalog enquiry (no preset message, just open chat)
+const whatsappHref = DIGITS
+  ? `https://wa.me/${DIGITS}`
+  : "https://wa.me/919925155141";
+
+// ===== API URLs =====
+const FAQ_API_URL = import.meta.env.PUBLIC_API_BASE_URL + "/faqa";
+const PRODUCT_FAQ_API_URL =
+  import.meta.env.PUBLIC_API_BASE_URL + "/productandlocation/astro/products";
+
+type FaqItem = {
+  id: string;
+  questionHtml: string;
+  answerHtml: string;
+  source?: "global" | "product" | "location";
+};
+
+/* ========= Helpers ========= */
+
+const norm = (v: any) => String(v ?? "").trim().toLowerCase();
+
+/** TinyMCE sometimes stores questions as <pre><strong>Q?</strong></pre>.
+ *  That breaks responsiveness, so normalize <pre> → <p>.
+ */
+function cleanHtml(html: string): string {
+  if (!html) return "";
+  return html
+    .replace(/<pre[^>]*>/gi, "<p>")
+    .replace(/<\/pre>/gi, "</p>");
+}
+
+/* ========= Get current slug from URL ========= */
+
+const pageUrl = new URL(Astro.request.url);
+const path = pageUrl.pathname.replace(/^\/+|\/+$/g, "");
+const segments = path ? path.split("/") : [];
+// For URLs like /slug or /slug/in/...
+const slugFromUrl = segments[0] || "";
+const slugFromUrlNorm = norm(slugFromUrl);
+
+/* ========= Global FAQs from /api/faqa ========= */
+
+let globalFaqs: FaqItem[] = [];
+
+try {
+  const res = await fetch(FAQ_API_URL);
+  if (res.ok) {
+    const json = await res.json();
+    const data = Array.isArray(json?.data) ? json.data : [];
+    globalFaqs = data.map((item: any) => ({
+      id: String(item._id || Math.random()),
+      questionHtml: cleanHtml(String(item.question || "")),
+      answerHtml: cleanHtml(String(item.answer || "")),
+      source: "global",
+    }));
+  }
+} catch (err) {
+  globalFaqs = [];
+}
+
+/* ========= Product + Location FAQs from productandlocation API ========= */
+
+let combinedProductFaqs: FaqItem[] = [];
+
+try {
+  const res = await fetch(PRODUCT_FAQ_API_URL, {
+    headers: { Accept: "application/json", "Cache-Control": "no-cache" },
+  });
+  if (res.ok) {
+    const json = await res.json();
+    const rows = Array.isArray(json?.data) ? json.data : [];
+
+    // Try to match current slug with row.slug OR row.product.slug
+    const matchedRow =
+      rows.find((row: any) => {
+        const rowSlugNorm = norm(row.slug);
+        const productSlugNorm = norm(row.product?.slug);
+        return (
+          (rowSlugNorm && rowSlugNorm === slugFromUrlNorm) ||
+          (productSlugNorm && productSlugNorm === slugFromUrlNorm)
+        );
+      }) || rows[0];
+
+    if (matchedRow) {
+      const product: any = matchedRow.product || {};
+      const location: any = matchedRow.location || {};
+
+      // Product Q&A: productquestion1..6 / productanswer1..6
+      for (let i = 1; i <= 6; i++) {
+        const qKey = `productquestion${i}`;
+        const aKey = `productanswer${i}`;
+        const q = product[qKey];
+        const a = product[aKey];
+
+        if (q && a && String(q).trim() && String(a).trim()) {
+          combinedProductFaqs.push({
+            id: `product-${matchedRow._id}-${i}`,
+            questionHtml: cleanHtml(String(q)),
+            answerHtml: cleanHtml(String(a)),
+            source: "product",
+          });
+        }
+      }
+
+      // Location Q&A: locationquestion1..6 / locationanswer1..6
+      for (let i = 1; i <= 6; i++) {
+        const qKey = `locationquestion${i}`;
+        const aKey = `locationanswer${i}`;
+        const q = location[qKey];
+        const a = location[aKey];
+
+        if (q && a && String(q).trim() && String(a).trim()) {
+          combinedProductFaqs.push({
+            id: `location-${matchedRow._id}-${i}`,
+            questionHtml: cleanHtml(String(q)),
+            answerHtml: cleanHtml(String(a)),
+            source: "location",
+          });
+        }
+      }
+    }
+  }
+} catch (err) {
+  combinedProductFaqs = [];
+}
+
+/* ========= Final list: product/location FAQs first, then global ========= */
+
+const allFaqs: FaqItem[] = [...combinedProductFaqs, ...globalFaqs];
+---
+
+<section id="faq" class="faq-section">
+  <div class="container">
+    <div class="faq-layout">
+      <!-- Left: Intro + CTA -->
+      <div class="faq-intro">
+        <p class="faq-eyebrow">FAQ • Support for your sourcing team</p>
+        <h2 class="faq-title">Clear answers, zero friction.</h2>
+        <p class="faq-text">
+          A quick snapshot of how we handle MOQ, sampling, timelines, and quality
+          so your team can move faster with confidence.
+        </p>
+        <ul class="faq-points">
+          <li>Realistic MOQs for brands & exporters</li>
+          <li>Structured QA + lab testing support</li>
+          <li>Custom fabric development on request</li>
+        </ul>
+
+        <div class="faq-cta-inline">
+          <!-- CALL: Talk to a Fabric Specialist -->
+          <a href={telHref} class="btn">
+            Talk to a Fabric Specialist
+          </a>
+
+          <!-- WHATSAPP: Browse Fabric Catalog -->
+          <a
+            href={whatsappHref}
+            class="btn secondary"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Browse Fabric Catalog
+          </a>
+        </div>
+      </div>
+
+      <!-- Right: FAQ List -->
+      <div class="faq-list-wrap">
+        <div class="faq-list">
+          {allFaqs.length > 0 ? (
+            allFaqs.map((faq) => (
+              <div class="faq-item" data-faq-item>
+                <button class="faq-question" type="button" aria-expanded="false">
+                  <!-- Question HTML from API(s) -->
+                  <div class="faq-question-main" set:html={faq.questionHtml}></div>
+
+                  <span class="faq-icon-wrap">
+                    <svg
+                      class="faq-icon"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 16 16"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M3 8H13M8 3V13"
+                        stroke="currentColor"
+                        stroke-width="1.6"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </span>
+                </button>
+                <div class="faq-answer" hidden>
+                  <!-- Answer HTML from API(s) -->
+                  <div class="faq-answer-inner" set:html={faq.answerHtml}></div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p>No FAQs available right now. Please check back later.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .faq-section {
+    padding: 72px 0;
+    background: var(--tp-grey-1);
+  }
+
+  .faq-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    gap: 56px;
+    align-items: flex-start;
+  }
+
+  /* Intro column */
+  .faq-intro {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .faq-eyebrow {
+    font-size: 0.8rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--tp-theme-primary);
+    font-weight: 600;
+    display: inline-block;
+    padding: 6px 12px;
+    background: rgba(44, 76, 151, 0.08);
+    border-radius: 20px;
+    width: fit-content;
+    margin: 0;
+  }
+
+  .faq-title {
+    font-size: clamp(1.9rem, 4vw, 2.2rem);
+    line-height: 1.2;
+    color: var(--tp-text-1);
+    margin: 0;
+    font-family: var(--tp-ff-display);
+    font-weight: 700;
+  }
+
+  .faq-text {
+    margin: 0;
+    font-size: 1.02rem;
+    line-height: 1.7;
+    color: var(--tp-text-2);
+    max-width: 90%;
+  }
+
+  .faq-points {
+    margin: 8px 0 0;
+    padding-left: 0;
+    display: grid;
+    gap: 10px;
+    font-size: 0.95rem;
+    color: var(--tp-text-2);
+  }
+
+  .faq-points li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    list-style: none;
+  }
+
+  .faq-points li::before {
+    content: "";
+    display: block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--tp-theme-secondary);
+  }
+
+  .faq-cta-inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .faq-cta-inline .btn {
+    padding: 11px 22px;
+    font-size: 0.92rem;
+    border-radius: 999px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    text-align: center;
+    justify-content: center;
+  }
+
+  .faq-cta-inline .btn.secondary {
+    background: transparent;
+    color: var(--tp-theme-primary);
+    border: 1.5px solid rgba(44, 76, 151, 0.3);
+  }
+
+  .faq-cta-inline .btn.secondary:hover {
+    border-color: var(--tp-theme-primary);
+    background: rgba(44, 76, 151, 0.05);
+    transform: translateY(-1px);
+  }
+
+  /* FAQ list column */
+  .faq-list-wrap {
+    display: flex;
+    justify-content: center;
+  }
+
+  .faq-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: 100%;
+    max-width: 620px;
+  }
+
+  .faq-item {
+    border-radius: 18px;
+    background: var(--tp-common-white);
+    border: 1px solid var(--tp-grey-2);
+    box-shadow: var(--shadow-1);
+    padding: 0;
+    transition: all 0.25s ease;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .faq-item::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 0;
+    background: var(--tp-theme-primary);
+    transition: height 0.25s ease;
+  }
+
+  .faq-item:hover {
+    box-shadow: 0 8px 24px rgba(17, 35, 56, 0.12);
+    border-color: rgba(44, 76, 151, 0.18);
+  }
+
+  .faq-item.active {
+    border-color: var(--tp-theme-primary);
+    box-shadow: 0 8px 26px rgba(44, 76, 151, 0.16);
+  }
+
+  .faq-item.active::before {
+    height: 100%;
+  }
+
+  .faq-question {
+    width: 100%;
+    padding: 16px 20px 16px 24px;
+    cursor: pointer;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.98rem;
+    font-weight: 600;
+    color: var(--tp-text-1);
+    background: none;
+    border: none;
+    text-align: left;
+    font-family: inherit;
+    transition: all 0.25s ease;
+  }
+
+  .faq-question:hover {
+    color: var(--tp-theme-primary);
+  }
+
+  .faq-question-main {
+    flex: 1;
+    min-width: 0;
+    word-break: break-word;
+  }
+
+  .faq-question-main :where(h1, h2, h3, h4, h5, h6, p, strong, em, span) {
+    margin: 0;
+    font: inherit;
+    color: inherit;
+  }
+
+  /* Normalise pre tags from TinyMCE so they don't look like code blocks */
+  .faq-question-main pre,
+  .faq-answer-inner pre {
+    font: inherit;
+    white-space: normal !important;
+    word-break: break-word;
+    margin: 0;
+  }
+
+  .faq-icon-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    background: rgba(44, 76, 151, 0.08);
+    color: var(--tp-theme-primary);
+    flex-shrink: 0;
+    transition: all 0.25s ease;
+  }
+
+  .faq-item.active .faq-icon-wrap {
+    background: var(--tp-theme-primary);
+    color: var(--tp-common-white);
+  }
+
+  .faq-icon {
+    transition: transform 0.25s ease;
+  }
+
+  .faq-item.active .faq-icon {
+    transform: rotate(45deg);
+  }
+
+  .faq-answer {
+    padding: 0 24px;
+    max-height: 0;
+    overflow: hidden;
+    font-size: 0.93rem;
+    line-height: 1.65;
+    color: var(--tp-text-2);
+    transition: max-height 0.3s ease, padding-bottom 0.3s ease,
+      opacity 0.3s ease;
+    opacity: 0;
+  }
+
+  .faq-item.active .faq-answer {
+    padding-bottom: 14px;
+    opacity: 1;
+  }
+
+  .faq-answer-inner {
+    padding-top: 2px;
+  }
+
+  .faq-answer-inner :where(p, h1, h2, h3, h4, h5, h6) {
+    margin: 4px 0 0;
+    font-size: 0.93rem;
+    line-height: 1.65;
+  }
+
+  .faq-answer-inner ul,
+  .faq-answer-inner ol {
+    padding-left: 1.2rem;
+    margin: 6px 0 0;
+  }
+
+  .faq-answer-inner li {
+    margin: 2px 0;
+  }
+
+  /* Responsive */
+  @media (max-width: 1024px) {
+    .faq-layout {
+      grid-template-columns: 1fr;
+      gap: 40px;
+    }
+
+    .faq-section {
+      padding: 60px 0;
+    }
+
+    .faq-text {
+      max-width: 100%;
+    }
+
+    .faq-list {
+      max-width: 100%;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .faq-section {
+      padding: 40px 0;
+    }
+
+    .faq-title {
+      font-size: 1.7rem;
+    }
+
+    .faq-question {
+      padding: 14px 16px;
+      font-size: 0.95rem;
+    }
+
+    .faq-answer {
+      padding: 0 16px;
+    }
+
+    .faq-item.active .faq-answer {
+      padding-bottom: 12px;
+    }
+
+    .faq-cta-inline {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .faq-cta-inline .btn {
+      width: 100%;
+      text-align: center;
+    }
+  }
+</style>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const faqItems = document.querySelectorAll("[data-faq-item]");
+
+    faqItems.forEach((item) => {
+      const questionEl = item.querySelector(".faq-question");
+      const answerEl = item.querySelector(".faq-answer");
+
+      // Make sure these are real HTMLElements so TS/JS both agree they have style/hidden
+      if (!(questionEl instanceof HTMLElement) || !(answerEl instanceof HTMLElement)) {
+        return;
+      }
+
+      const question = questionEl;
+      const answer = answerEl;
+
+      question.addEventListener("click", () => {
+        const isActive = item.classList.contains("active");
+
+        // Close all other items
+        faqItems.forEach((otherItem) => {
+          if (otherItem === item) return;
+
+          const otherQuestionEl = otherItem.querySelector(".faq-question");
+          const otherAnswerEl = otherItem.querySelector(".faq-answer");
+
+          if (
+            !(otherQuestionEl instanceof HTMLElement) ||
+            !(otherAnswerEl instanceof HTMLElement)
+          ) {
+            return;
+          }
+
+          otherItem.classList.remove("active");
+          otherAnswerEl.style.maxHeight = "0px";
+          otherAnswerEl.hidden = true;
+          otherQuestionEl.setAttribute("aria-expanded", "false");
+        });
+
+        if (!isActive) {
+          // Open current
+          item.classList.add("active");
+          answer.hidden = false;
+          answer.style.maxHeight = answer.scrollHeight + "px";
+          question.setAttribute("aria-expanded", "true");
+        } else {
+          // Close current
+          item.classList.remove("active");
+          answer.style.maxHeight = "0px";
+          question.setAttribute("aria-expanded", "false");
+
+          setTimeout(() => {
+            if (!item.classList.contains("active")) {
+              answer.hidden = true;
+            }
+          }, 300);
+        }
+      });
+    });
+  });
+</script>
+

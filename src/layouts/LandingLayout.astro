@@ -1,0 +1,130 @@
+---
+import "../styles/theme.css";
+import Navbar from "../components/common/Navbar.astro";
+import Footer from "../components/common/Footer.astro";
+import PerfBooster from "../components/common/PerfBooster.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+
+interface LayoutProps {
+  /** These should come from your SEO APIs only */
+  title?: string;
+  description?: string;
+  canonical?: string;
+}
+
+const { title, description, canonical } = Astro.props as LayoutProps;
+
+/**
+ * Backend / API origin derived from env
+ * Example:
+ * PUBLIC_API_BASE_URL = "https://test.amrita-fashions.com/landing"
+ * => API_ORIGIN = "https://test.amrita-fashions.com"
+ */
+const RAW_API_BASE = import.meta.env.PUBLIC_API_BASE_URL as string | undefined;
+let API_ORIGIN = "";
+
+if (RAW_API_BASE) {
+  try {
+    API_ORIGIN = new URL(RAW_API_BASE).origin;
+  } catch {
+    // Fallback: strip trailing slashes and path if URL constructor fails
+    API_ORIGIN = RAW_API_BASE.replace(/\/+$/, "");
+  }
+}
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!-- Viewport default; pages can override in head slot -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+
+    {title && <title>{title}</title>}
+    {description && <meta name="description" content={description} />}
+    {canonical && <link rel="canonical" href={canonical} />}
+
+    <!-- Favicons -->
+    <link rel="icon" href="/favicon.svg" />
+
+    <!-- Non-blocking perf hints -->
+
+    {API_ORIGIN && (
+      <>
+        <link rel="dns-prefetch" href={API_ORIGIN} />
+        <link rel="preconnect" href={API_ORIGIN} crossorigin />
+      </>
+    )}
+
+    <!-- Cloudinary can stay static or you can move to env later if needed -->
+    <link rel="dns-prefetch" href="https://res.cloudinary.com" />
+    <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
+
+    <meta name="color-scheme" content="light dark" />
+
+    <!-- Page-level SEO injection (extra meta/OG/Twitter) BEFORE scripts -->
+    <slot name="head" />
+
+    <!-- Load URL lock from external module (content won't show in View Source) -->
+    <link rel="modulepreload" href="/scripts/url-lock.mjs" />
+    <script type="module" src="/scripts/url-lock.mjs"></script>
+  </head>
+
+  <body class="page">
+    <!-- <Navbar /> -->
+    <SiteHeader />
+    <main id="main" class="container-fluid">
+      <slot />
+    </main>
+    <Footer />
+    <!-- Keep PerfBooster at the very end so it can't race the URL lock -->
+    <PerfBooster />
+
+    <!-- Global smooth scroll handler for all anchor links -->
+    <script is:inline>
+      document.addEventListener("DOMContentLoaded", function () {
+        document.addEventListener("click", function (e) {
+          const target = e.target.closest("a");
+          if (!target) return;
+
+          const href = target.getAttribute("href");
+          if (!href || !href.startsWith("#")) return;
+
+          // Skip if already handled by site-header.js
+          if (
+            target.closest(
+              ".nav-links, .mobile-nav, .age-footer, .cta, .m-cta",
+            )
+          )
+            return;
+
+          const targetId = href.slice(1);
+          const targetElement = document.getElementById(targetId);
+
+          if (targetElement) {
+            e.preventDefault();
+
+            const header = document.querySelector(".site-header");
+            const headerHeight = header ? header.offsetHeight : 96;
+            const offset = headerHeight + 40;
+
+            const targetPosition =
+              targetElement.getBoundingClientRect().top +
+              window.pageYOffset -
+              offset;
+
+            window.scrollTo({
+              top: targetPosition,
+              behavior: "smooth",
+            });
+
+            history.pushState(null, "", href);
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,223 @@
+---
+/**
+ * Prints ONLY extra SEO meta/link tags from:
+ * - Page-level seo (from SEO APIs / product×location API)
+ * - Global defaultSeo (from /api/defaultseo)
+ *
+ * It deliberately does NOT output:
+ * - <title>
+ * - <meta name="description">
+ * - <link rel="canonical">
+ * Those are handled by the main layout using API values passed as props.
+ */
+
+interface Props {
+  seo?: Record<string, any> | null;
+  canonical?: string | undefined;
+}
+
+const { seo = null, canonical } = Astro.props as Props;
+
+/* ========= Default SEO API ========= */
+
+const API_BASE = import.meta.env.PUBLIC_API_BASE_URL;
+const DEFAULT_SEO_API = `${API_BASE}/defaultseo`;
+
+let defaultSeo: Record<string, any> | null = null;
+
+try {
+  const res = await fetch(DEFAULT_SEO_API, {
+    headers: { accept: "application/json" },
+  });
+
+  if (res.ok) {
+    const json = await res.json();
+
+    if (Array.isArray(json) && json.length > 0) {
+      defaultSeo = json[0];
+    } else if (Array.isArray(json?.data) && json.data.length > 0) {
+      defaultSeo = json.data[0];
+    } else {
+      defaultSeo = json;
+    }
+  }
+} catch {
+  defaultSeo = null;
+}
+
+/* ========= Helpers ========= */
+
+const asText = (v: any) => {
+  if (v === null || v === undefined) return "";
+  const s = String(v).trim();
+  return s;
+};
+
+const asNumber = (value: any) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+};
+
+/**
+ * Pick a value only from API sources:
+ * 1) page-level seo object
+ * 2) defaultSeo object
+ *
+ * No hard-coded strings are used.
+ */
+const pickSeo = (...keys: string[]) => {
+  for (const key of keys) {
+    const v = (seo as any)?.[key];
+    if (v !== undefined && v !== null && String(v).trim() !== "") return v;
+  }
+  for (const key of keys) {
+    const v = (defaultSeo as any)?.[key];
+    if (v !== undefined && v !== null && String(v).trim() !== "") return v;
+  }
+  return undefined;
+};
+
+/* ========= Resolved meta values (APIs only) ========= */
+
+const title       = asText(pickSeo("title"));
+const description = asText(pickSeo("description"));
+
+const keywords    = asText(pickSeo("keywords"));
+const robots      = asText(pickSeo("robots"));
+
+const author      = asText(pickSeo("author_name", "authorname"));
+
+const siteName    = asText(pickSeo("ogSiteName", "ogsitename"));
+const ogType      = asText(pickSeo("ogType", "ogtype"));
+const ogLocale    = asText(pickSeo("ogLocale", "oglocale"));
+
+const themeColor  = asText(pickSeo("themeColor", "themecolor"));
+const fmtDetect   = asText(pickSeo("formatDetection", "formatdetection"));
+
+const gVerify     = asText(
+  pickSeo("googleSiteVerification", "googlesiteverification")
+);
+
+const msValidate  = asText(
+  pickSeo("msValidate", "microsofttoken")
+);
+
+const appleStatus = asText(
+  pickSeo("appleStatusBarStyle", "applestatusbarstyle")
+);
+
+const mobileCap   = asText(
+  pickSeo("mobileWebAppCapable", "mobilewebappcapable")
+);
+
+/* Twitter */
+
+const twitterCard  = asText(pickSeo("twitterCard", "twittercard"));
+const twitterSite  = asText(pickSeo("twitterSite", "twittersite"));
+
+/**
+ * For Twitter title/description:
+ * - Prefer dedicated twitterTitle/twitterDescription if present.
+ * - If not, fall back to title/description that also came from APIs.
+ */
+const rawTwitterTitle = pickSeo("twitterTitle", "twittertitle");
+const twitterTitle = asText(rawTwitterTitle ?? title);
+
+const rawTwitterDesc = pickSeo("twitterDescription", "twitterdescription");
+const twitterDesc = asText(rawTwitterDesc ?? description);
+
+const twitterPlayer = asText(
+  pickSeo("twitterPlayer", "twitterplayer")
+);
+
+const tpW = asNumber(pickSeo("twitterPlayerWidth", "twitterplayerwidth"));
+const tpH = asNumber(pickSeo("twitterPlayerHeight", "twitterplayerheight"));
+
+/* OG video */
+
+const ogVideoType = asText(pickSeo("ogVideoType", "ogvideotype"));
+const ogVideoW    = asNumber(pickSeo("ogVideoWidth", "ogvideowidth"));
+const ogVideoH    = asNumber(pickSeo("ogVideoHeight", "ogvideoheight"));
+
+/* Optional analytics IDs (still from API) */
+const gaId       = pickSeo("gaId", "gaid");
+const clarityId  = pickSeo("clarityId", "clarityid");
+
+/**
+ * URL for OG/Twitter:
+ * - Use canonical prop if provided (this should come from API).
+ * - If not provided, we do NOT invent a URL.
+ */
+const urlForMeta = canonical && canonical.trim().length
+  ? canonical.trim()
+  : "";
+---
+
+<!-- Title / description / canonical are handled by the main layout using API values -->
+
+<!-- Basics -->
+{keywords && <meta name="keywords" content={keywords} />}
+{robots && <meta name="robots" content={robots} />}
+{author && <meta name="author" content={author} />}
+{themeColor && <meta name="theme-color" content={themeColor} />}
+{fmtDetect && <meta name="format-detection" content={fmtDetect} />}
+{gVerify && <meta name="google-site-verification" content={gVerify} />}
+{msValidate && <meta name="msvalidate.01" content={msValidate} />}
+{appleStatus && (
+  <meta
+    name="apple-mobile-web-app-status-bar-style"
+    content={appleStatus}
+  />
+)}
+{mobileCap && <meta name="mobile-web-app-capable" content={mobileCap} />}
+
+<!-- Open Graph -->
+{title && <meta property="og:title" content={title} />}
+{description && <meta property="og:description" content={description} />}
+{siteName && <meta property="og:site_name" content={siteName} />}
+{ogType && <meta property="og:type" content={ogType} />}
+{ogLocale && <meta property="og:locale" content={ogLocale} />}
+{urlForMeta && <meta property="og:url" content={urlForMeta} />}
+
+{ogVideoType && <meta property="og:video:type" content={ogVideoType} />}
+{typeof ogVideoW === "number" && (
+  <meta property="og:video:width" content={String(ogVideoW)} />
+)}
+{typeof ogVideoH === "number" && (
+  <meta property="og:video:height" content={String(ogVideoH)} />
+)}
+
+<!-- Twitter -->
+{twitterCard && <meta name="twitter:card" content={twitterCard} />}
+{twitterSite && <meta name="twitter:site" content={twitterSite} />}
+{twitterTitle && <meta name="twitter:title" content={twitterTitle} />}
+{twitterDesc && <meta name="twitter:description" content={twitterDesc} />}
+{twitterPlayer && <meta name="twitter:player" content={twitterPlayer} />}
+{typeof tpW === "number" && (
+  <meta name="twitter:player:width" content={String(tpW)} />
+)}
+{typeof tpH === "number" && (
+  <meta name="twitter:player:height" content={String(tpH)} />
+)}
+
+{gaId && (
+  <>
+    <script async src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}></script>
+    <script is:inline>
+      {`window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', '${gaId}');`}
+    </script>
+  </>
+)}
+
+{clarityId && (
+  <script is:inline>
+    {`(function(c,l,a,r,i,t,y){
+c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+})(window, document, "clarity", "script", "${clarityId}");`}
+  </script>
+)}

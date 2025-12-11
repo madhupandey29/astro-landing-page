@@ -1,0 +1,467 @@
+---
+// Catalog Preview Page - to visualize the PDF design
+const sampleProduct = {
+  name: "Premium Cotton T-Shirtttttt",
+  sku: "Nokia-601",
+  gsm: "125",
+  oz: "3.7",
+  cm: "147",
+  inch: "58",
+  weight: "125 gsm / 3.7 oz",
+  width: "147 cm / 58 inch",
+  content: "100% cotton",
+  finish: "Laffer",
+  design: "Solid Dyed",
+  structure: "Plain Weave, 1/1 Weave",
+  colors: "Red, Olive",
+  motif: "None/ NA",
+  leadtime: "7 days",
+  rating: 4,
+  reviews: 5,
+  fullProductDescription: "Experience the versatility of our Bright Red Solid Dyed 100% Cotton Poplin Fabric, crafted with a plain 1/1 weave for a crisp, smooth texture. This medium-lightweight fabric has a GSM of 125, making it ideal for high-quality apparel, uniforms, and shirting applications. Woven from 100% premium cotton fibers, it is finished with either a Carbon Finish for a clean, flat appearance, or a Laffer Finish for enhanced softness and drape.",
+  image3: "/images/placeholder-800x600.svg",
+  image1: "/images/placeholder-800x600.svg",
+  image2: "/images/placeholder-800x600.svg",
+};
+
+const office = {
+  companyName: "AMRITA GLOBAL ENTERPRISES",
+  companyAddress: "404, Safal Prelude, Corporate Rd, Prahlad Nagar, Ahmedabad, Gujarat 380015",
+  phone1: "+919824003484",
+  phone2: "+917948466368",
+  email: "info@amritafashions.com",
+  website: "landing-page-22.vercel.app"
+};
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Catalog Preview - {sampleProduct.name}</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Helvetica', Arial, sans-serif;
+      background: #2a2a2a;
+      padding: 40px 20px;
+    }
+    
+    .page {
+      width: 595px;
+      height: 680px;
+      background: white;
+      margin: 0 auto;
+      padding: 0;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      position: relative;
+    }
+    
+    /* HEADER */
+    .header-top {
+      padding: 16px 42px 0;
+      text-align: right;
+    }
+    
+    .company-name {
+      font-size: 18px;
+      font-weight: bold;
+      color: #2C4C97;
+      letter-spacing: 0.5px;
+      line-height: 1;
+    }
+    
+    .header-lines {
+      position: relative;
+      padding: 0;
+      margin: 0;
+      padding-bottom: 24px;
+    }
+    
+    .logo-wrapper {
+      position: absolute;
+      left: 42px;
+      top: -27px;
+      z-index: 2;
+      background: white;
+      border-radius: 50%;
+      padding: 2px;
+    }
+    
+    .logo {
+      width: 50px;
+      height: 50px;
+      display: block;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+    
+    .gold-line {
+      height: 3px;
+      background: #D6A74B;
+    }
+    
+    .blue-line {
+      height: 2px;
+      background: #2C4C97;
+      margin-top: 2px;
+    }
+    
+    /* CONTENT */
+    .content {
+      padding: 0 42px 8px;
+    }
+    
+    /* IMAGES SECTION */
+    .images-grid {
+      display: grid;
+      grid-template-columns: 1fr 0.6fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    
+    .main-image {
+      background: #F7F8FA;
+      border: 1px solid #E5E7EB;
+      border-radius: 4px;
+      height: 140px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    
+    .main-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    
+    .side-images {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    
+    .side-image {
+      background: #F7F8FA;
+      border: 1px solid #E5E7EB;
+      border-radius: 4px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    
+    .side-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    
+    /* PRODUCT TITLE BAR */
+    .title-bar {
+      background: #2C4C97;
+      padding: 6px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      border-radius: 4px;
+    }
+    
+    .product-title {
+      color: white;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    
+    .product-sku {
+      color: white;
+      font-size: 11px;
+    }
+    
+    /* MEASUREMENTS TABLE */
+    .measurements {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border: 1px solid #E5E7EB;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    
+    .measure-cell {
+      padding: 8px;
+      text-align: center;
+      border-right: 1px solid #E5E7EB;
+    }
+    
+    .measure-cell:last-child {
+      border-right: none;
+    }
+    
+    .measure-label {
+      font-size: 10px;
+      font-weight: bold;
+      color: #6B7280;
+      margin-bottom: 3px;
+    }
+    
+    .measure-value {
+      font-size: 11px;
+      color: #111827;
+      font-weight: 600;
+    }
+    
+    /* SPECIFICATIONS */
+    .section-title {
+      font-size: 11px;
+      font-weight: bold;
+      color: #2C4C97;
+      margin-bottom: 12px;
+    }
+    
+    .specs-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 18px;
+      margin-bottom: 12px;
+    }
+    
+    .spec-row {
+      display: flex;
+      gap: 8px;
+      font-size: 10px;
+    }
+    
+    .spec-label {
+      font-weight: bold;
+      color: #6B7280;
+      min-width: 70px;
+    }
+    
+    .spec-value {
+      color: #111827;
+      font-weight: 600;
+    }
+    
+    /* RATING */
+    .rating-section {
+      display: flex;
+      gap: 24px;
+      padding: 8px 0;
+      border-top: 1px dashed #E5E7EB;
+      border-bottom: 1px dashed #E5E7EB;
+      margin-bottom: 12px;
+    }
+    
+    .rating-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+    }
+    
+    .stars {
+      color: #F59E0B;
+      font-size: 12px;
+    }
+    
+    /* DESCRIPTION */
+    .description {
+      font-size: 10px;
+      line-height: 1.6;
+      color: #374151;
+      margin-bottom: 12px;
+    }
+    
+    .description p {
+      margin: 0 0 8px 0;
+    }
+    
+    .description h3 {
+      font-size: 11px;
+      margin: 8px 0 4px 0;
+      color: #2C4C97;
+    }
+    
+    /* FOOTER */
+    .footer {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 0;
+      background: white;
+    }
+    
+    .footer-lines {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    
+    .footer-gold-line {
+      height: 3px;
+      background: #D6A74B;
+    }
+    
+    .footer-blue-line {
+      height: 2px;
+      background: #2C4C97;
+    }
+    
+    .footer-content {
+      padding: 12px 42px 10px;
+    }
+    
+    .footer-address {
+      font-size: 11px;
+      color: #D6A74B;
+      margin-bottom: 5px;
+      font-weight: 600;
+    }
+    
+    .footer-contacts {
+      font-size: 10px;
+      color: #D6A74B;
+      margin-bottom: 6px;
+    }
+    
+    .footer-thanks {
+      font-size: 11px;
+      color: #D6A74B;
+      text-align: center;
+      margin-top: 6px;
+      font-weight: 700;
+    }
+    
+    .footer-date {
+      font-size: 9px;
+      color: #B8A06F;
+      text-align: center;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <!-- HEADER -->
+    <div class="header-top">
+      <div class="company-name">{office.companyName}</div>
+    </div>
+    <div class="header-lines">
+      <div class="logo-wrapper">
+        <img src="/images/brand/age.avif" alt="Logo" class="logo">
+      </div>
+      <div class="gold-line"></div>
+      <div class="blue-line"></div>
+    </div>
+    
+    <!-- CONTENT -->
+    <div class="content">
+      <!-- IMAGES -->
+      <div class="images-grid">
+        <div class="main-image">
+          <img src={sampleProduct.image3} alt="Main product image">
+        </div>
+        <div class="side-images">
+          <div class="side-image">
+            <img src={sampleProduct.image1} alt="Product image 1">
+          </div>
+          <div class="side-image">
+            <img src={sampleProduct.image2} alt="Product image 2">
+          </div>
+        </div>
+      </div>
+      
+      <!-- TITLE BAR -->
+      <div class="title-bar">
+        <div class="product-title">{sampleProduct.name}</div>
+        <div class="product-sku">SKU: {sampleProduct.sku}</div>
+      </div>
+      
+      <!-- SPECIFICATIONS -->
+      <div class="section-title">Product Specifications:</div>
+      <div class="specs-grid">
+        <div class="spec-row">
+          <span class="spec-label">Content:</span>
+          <span class="spec-value">{sampleProduct.content}</span>
+        </div>
+        <div class="spec-row">
+          <span class="spec-label">Weight:</span>
+          <span class="spec-value">{sampleProduct.weight}</span>
+        </div>
+        <div class="spec-row">
+          <span class="spec-label">Width:</span>
+          <span class="spec-value">{sampleProduct.width}</span>
+        </div>
+        <div class="spec-row">
+          <span class="spec-label">Finish:</span>
+          <span class="spec-value">{sampleProduct.finish}</span>
+        </div>
+        <div class="spec-row">
+          <span class="spec-label">Design:</span>
+          <span class="spec-value">{sampleProduct.design}</span>
+        </div>
+        <div class="spec-row">
+          <span class="spec-label">Motif:</span>
+          <span class="spec-value">{sampleProduct.motif}</span>
+        </div>
+        <div class="spec-row">
+          <span class="spec-label">Structure:</span>
+          <span class="spec-value">{sampleProduct.structure}</span>
+        </div>
+        <div class="spec-row">
+          <span class="spec-label">Colors:</span>
+          <span class="spec-value">{sampleProduct.colors}</span>
+        </div>
+        <div class="spec-row">
+          <span class="spec-label">Lead time:</span>
+          <span class="spec-value">{sampleProduct.leadtime}</span>
+        </div>
+      </div>
+      
+      <!-- RATING -->
+      <div class="rating-section">
+        <div class="rating-item">
+          <span class="spec-label">Rating:</span>
+          <span class="stars">{'★'.repeat(sampleProduct.rating)}{'☆'.repeat(5 - sampleProduct.rating)}</span>
+        </div>
+        <div class="rating-item">
+          <span class="spec-label">Reviews:</span>
+          <span class="spec-value">{sampleProduct.reviews}</span>
+        </div>
+      </div>
+      
+      <!-- DESCRIPTION -->
+      <div class="section-title">Description:</div>
+      <div class="description" set:html={sampleProduct.fullProductDescription}></div>
+    </div>
+    
+    <!-- FOOTER -->
+    <div class="footer">
+      <div class="footer-lines">
+        <div class="footer-gold-line"></div>
+        <div class="footer-blue-line"></div>
+      </div>
+      <div class="footer-content">
+        <div class="footer-address">{office.companyAddress}</div>
+        <div class="footer-contacts">
+          Phone: {office.phone1} | {office.phone2} | Email: {office.email}
+        </div>
+        <div class="footer-thanks">Thank you for your interest in our products!</div>
+        <div class="footer-date">{new Date().toLocaleDateString()}</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
