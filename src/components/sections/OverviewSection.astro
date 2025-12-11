@@ -1,98 +1,142 @@
 ---
 /* Static-headed, slug-aware Overview (no CTA, hoverable stat cards) */
+import { apiGet } from '../../lib/api-client';
+
 export interface Props {
   currentSlug?: string | null;
   seoApi?: string;
   productApi?: string;
 }
+
 const { currentSlug = null, seoApi, productApi } = Astro.props;
 
-/* ===== Endpoints & headers ===== */
-const RAW_BASE = (import.meta.env.PUBLIC_API_BASE_URL).replace(/\/+$/,'');
-const SEO_URL = (seoApi ?? `${RAW_BASE}/seo`).replace(/\/+$/,'');
-const PRODUCT_URL = (productApi ?? `${RAW_BASE}/product`).replace(/\/+$/,'');
+// Endpoints & headers
 
-const API_KEY = import.meta.env.PUBLIC_API_KEY ?? "";
-const ADMIN_EMAIL = import.meta.env.PUBLIC_ADMIN_EMAIL ?? "";
-const API_KEY_HEADER = import.meta.env.PUBLIC_API_KEY_HEADER ?? "x-api-key";
-const ADMIN_EMAIL_HEADER = import.meta.env.PUBLIC_ADMIN_EMAIL_HEADER ?? "x-admin-email";
-const headers: Record<string, string> = { Accept: "application/json" };
-if (API_KEY) headers[API_KEY_HEADER] = API_KEY;
-if (ADMIN_EMAIL) headers[ADMIN_EMAIL_HEADER] = ADMIN_EMAIL;
+// Read env safely (might be undefined on some environments)
+const RAW_BASE_ENV = import.meta.env.PUBLIC_API_BASE_URL;
+const RAW_BASE =
+  typeof RAW_BASE_ENV === "string" ? RAW_BASE_ENV.replace(/\/+$/, "") : "";
 
-/* ===== Helpers ===== */
-const safe = (v:any)=> (v==null ? "" : String(v));
-const norm = (s:any)=> safe(s).trim().toLowerCase();
-const toId = (v:any)=> typeof v==="string" ? v.trim() : (v && v._id ? String(v._id).trim() : "");
-const pickHtml = (o:any)=>{
-  if(!o) return "";
-  const c = [
-    o.productlocationdescription1, o.productlocationdescription2,
-    o.description_html, o.productdescription, o.description1, o.description2, o.description3
-  ];
-  for (const x of c) {
-    if (typeof x === "string" && x.trim()) return x.trim();
-  }
-  return "";
-};
-const cleanHtml = (s:string)=> s.replace(/^\s*\.\s*$/gm,"");
-async function fetchJson(url:string){
-  try{
-    const r = await fetch(url,{headers});
-    if(!r.ok) return null;
-    return await r.json();
-  }catch{
+// Build URLs only if we actually have a base or explicit prop
+const SEO_URL = (seoApi || (RAW_BASE ? `${RAW_BASE}/seo` : "") || "").replace(
+  /\/+$/,
+  ""
+);
+const PRODUCT_URL = (
+  productApi || (RAW_BASE ? `${RAW_BASE}/product` : "") || ""
+).replace(/\/+$/, "");
+
+// Optional debug (won't break anything)
+if (!RAW_BASE) {
+  console.warn(
+    "[OverviewSection] PUBLIC_API_BASE_URL is missing – Overview will render with fallback content only."
+  );
+}
+
+// Updated fetch function using our new authenticated client
+async function fetchJson(endpoint: string) {
+  try {
+    if (!endpoint) return null;
+    const response = await apiGet(endpoint);
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
     return null;
   }
 }
 
-/* ===== Fetch ===== */
+// Fetch data using our new authenticated client
 const [seoJson, prodJson] = await Promise.all([
-  fetchJson(SEO_URL),
-  fetchJson(PRODUCT_URL)
+  fetchJson('seo'),
+  fetchJson('product')
 ]);
-const seos:any[]  = Array.isArray(seoJson?.data) ? seoJson.data : (Array.isArray(seoJson) ? seoJson : []);
-const prods:any[] = Array.isArray(prodJson?.data) ? prodJson.data : (Array.isArray(prodJson) ? prodJson : []);
 
-function pickSeo(){
-  if(!seos.length) return null;
-  if(currentSlug){
-    const bySlug = seos.find((s)=> norm(s?.slug)===norm(currentSlug));
-    if(bySlug) return bySlug;
+// Process data as before
+const seos: any[] = Array.isArray(seoJson?.data) ? seoJson.data : [];
+const products: any[] =
+  Array.isArray(prodJson?.data) ? prodJson.data :
+  Array.isArray(prodJson?.data?.products) ? prodJson.data.products :
+  Array.isArray(prodJson) ? prodJson : [];
+  
+const safe = (v: any) => (v == null ? "" : String(v));
+const norm = (s: any) => safe(s).trim().toLowerCase();
+const toId = (v: any) =>
+  typeof v === "string"
+    ? v.trim()
+    : v && v._id
+    ? String(v._id).trim()
+    : "";
+
+const pickHtml = (o: any) => {
+  if (!o) return "";
+  const candidates = [
+    o.productlocationdescription1,
+    o.productlocationdescription2,
+    o.description_html,
+    o.productdescription,
+    o.description1,
+    o.description2,
+    o.description3,
+  ];
+  for (const x of candidates) {
+    if (typeof x === "string" && x.trim()) return x.trim();
   }
-  return seos.find((s)=> s?.landingPageProduct) ?? seos[0] ?? null;
+  return "";
+};
+
+const cleanHtml = (s: string) => s.replace(/^\s*\.\s*$/gm, "");
+
+// Pick SEO & product
+function pickSeo() {
+  if (!seos.length) return null;
+
+  if (currentSlug) {
+    const bySlug = seos.find((s) => norm(s?.slug) === norm(currentSlug));
+    if (bySlug) return bySlug;
+  }
+
+  return seos.find((s) => s?.landingPageProduct) ?? seos[0] ?? null;
 }
 const seo = pickSeo();
 
-function pickProduct(){
-  if(!prods.length) return null;
+function pickProduct() {
+  // Fixed: Changed 'prods' to 'products' to match the actual variable name
+  if (!products.length) return null;
+
   const pid = toId(seo?.product);
-  if(pid){
-    const byId = prods.find((p)=> toId(p?._id)===pid);
-    if(byId) return byId;
+  if (pid) {
+    const byId = products.find((p) => toId(p?._id) === pid);
+    if (byId) return byId;
   }
-  if(seo?.slug){
-    const bySlug = prods.find((p)=> norm(p?.slug)===norm(seo.slug));
-    if(bySlug) return bySlug;
+
+  if (seo?.slug) {
+    const bySlug = products.find((p) => norm(p?.slug) === norm(seo.slug));
+    if (bySlug) return bySlug;
   }
-  return prods.find((p)=> p?.landingPageProduct) ?? prods[0] ?? null;
+
+  return products.find((p) => p?.landingPageProduct) ?? products[0] ?? null;
 }
 const product = pickProduct();
 
-/* ===== Static heading/tagline ===== */
+// Static heading/tagline
 const STATIC_HEADING = "Leading B2B Fabric Supplier Worldwide";
-const STATIC_TAGLINE = "ISO 9001 Certified • 500+ Global Partners • Ships to 50+ Countries";
+const STATIC_TAGLINE =
+  "ISO 9001 Certified • 500+ Global Partners • Ships to 50+ Countries";
 
-/* ===== Dynamic body + image ===== */
+// Dynamic body + image
 const p1 = cleanHtml(pickHtml(seo) || pickHtml(product) || "");
-const p2 = cleanHtml(seo?.productlocationdescription2 || product?.productlocationdescription2 || "");
+const p2 = cleanHtml(
+  seo?.productlocationdescription2 || product?.productlocationdescription2 || ""
+);
+
 const image = product?.image2 || product?.image3 || product?.image1 || "";
 const imageAlt = seo?.title || product?.name || "Fabric image";
 
-/* simple srcset using same URL (safe even if not Cloudinary) */
+// simple srcset using same URL (safe even if not Cloudinary)
 const imageSrcSet = image
   ? `${image} 480w, ${image} 768w, ${image} 1024w, ${image} 1440w`
   : "";
+
 ---
 
 <section class="ov" id="aboutus">
@@ -196,7 +240,7 @@ const imageSrcSet = image
       height:100%;
       object-fit:contain;
     }
-    
+
     /* Mobile: Match product hero by slug section image sizing */
     @media (max-width: 1024px){
       .media{
@@ -231,7 +275,7 @@ const imageSrcSet = image
       margin-top:1.5rem;
     }
 
-    /* base card look - enhanced styling */
+    /* Base card look */
     .stat{
       background:#f0f4f8;
       border:1px solid rgba(17,35,56,.10);
@@ -264,7 +308,7 @@ const imageSrcSet = image
       font-size:0.95rem;
       font-weight:600;
     }
-    
+
     @media (hover:hover){
       .stat:hover{
         transform:translateY(-3px);
@@ -280,7 +324,7 @@ const imageSrcSet = image
       outline-offset:2px;
     }
 
-    /* Mobile: Stacked layout (one card per row) with enhanced styling */
+    /* Mobile: stacked layout, one card per row */
     @media (max-width: 639px){
       .stats{
         grid-template-columns:1fr;
@@ -297,7 +341,7 @@ const imageSrcSet = image
       }
     }
 
-    /* Tablet & desktop: 3 columns, centered, a bit roomier */
+    /* Tablet & desktop: 3 columns, centered */
     @media (min-width: 640px){
       .stats{
         grid-template-columns:repeat(3,minmax(0,1fr));
@@ -336,7 +380,5 @@ const imageSrcSet = image
       /* Clear the float at the end of the text block so following sections don’t wrap */
       .copy:after{content:"";display:block;clear:both}
     }
-
-    /* Graceful fallback if CSS Shapes aren't supported. */
   </style>
 </section>

@@ -1,6 +1,9 @@
 /// <reference types="astro/client" />
 import type { APIRoute } from "astro";
 
+// Import our new API client
+import { apiGet } from "../../lib/api-client";
+
 export const prerender = false;
 
 const API_BASE = import.meta.env.PUBLIC_API_BASE_URL;
@@ -9,14 +12,13 @@ export const POST: APIRoute = async ({ request }) => {
   try {
     const { ids = [], offset = 0, limit = 3 } = await request.json();
 
-    const res = await fetch(`${API_BASE}/product`, {
-      headers: { Accept: "application/json" },
-    });
-    if (!res.ok) {
+    // Use our new authenticated API client
+    const response = await apiGet('product');
+    if (!response.ok) {
       return new Response(JSON.stringify({ items: [], total: 0, error: "upstream-failed" }), { status: 502 });
     }
 
-    const j = await res.json();
+    const j = await response.json();
     const all: any[] =
       Array.isArray(j?.data) ? j.data :
       Array.isArray(j?.data?.products) ? j.data.products :

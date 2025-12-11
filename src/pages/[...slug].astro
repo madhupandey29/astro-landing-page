@@ -18,6 +18,7 @@ import CityProductHero from "../components/sections/CityProductHero.astro";
 import ProductHeroBySlug from "../components/sections/ProductHeroBySlug.astro";
 import MarketAreaModal from "../components/MarketAreaModal.astro";
 import HeadSEO from "../components/HeadSEO.astro";
+import { apiGet } from "../lib/api-client";
 
 export const prerender = false;
 
@@ -26,8 +27,7 @@ const DEFAULT_CITY_CODE = "ahmedabad";
 const OVERVIEW_IMG = "/images/hero/overview-fabric.webp";
 
 /** Fixed default product slug used only for internal non-SEO logic */
-const FALLBACK_PRODUCT_SLUG = "premium-cotton-t-shirt";
-
+const FALLBACK_PRODUCT_SLUG = "silky-denim-55-ozs";
 // Use environment variable for API base
 const API_BASE = import.meta.env.PUBLIC_API_BASE_URL;
 const LANDING_API_BASE = import.meta.env.PUBLIC_API_BASE_URL;
@@ -36,6 +36,18 @@ const LANDING_API_BASE = import.meta.env.PUBLIC_API_BASE_URL;
 const SEO_PUBLIC_API = `${API_BASE}/seo/public`;
 const SEO_DETAIL_API = `${API_BASE}/seo`;
 const OFFICE_INFO_API = `${LANDING_API_BASE}/officeinformation`;
+const API_KEY = import.meta.env.PUBLIC_API_KEY;
+const API_KEY_HEADER = import.meta.env.PUBLIC_API_KEY_HEADER || "x-api-key";
+const ADMIN_EMAIL = import.meta.env.PUBLIC_ADMIN_EMAIL;
+const ADMIN_EMAIL_HEADER =
+  import.meta.env.PUBLIC_ADMIN_EMAIL_HEADER || "x-admin-email";
+
+const authHeaders = (): Record<string, string> => {
+  const headers: Record<string, string> = { accept: "application/json" };
+  if (API_KEY) headers[API_KEY_HEADER] = API_KEY;
+  if (ADMIN_EMAIL) headers[ADMIN_EMAIL_HEADER] = ADMIN_EMAIL;
+  return headers;
+};
 
 /** Product API */
 const PRODUCT_API = `${API_BASE}/product`;
@@ -122,7 +134,7 @@ const getGeoSlugsFromRequest = async (
       ? `${GEO_API_BASE}/${encodeURIComponent(ip)}/json/`
       : `${GEO_API_BASE}/json/`;
 
-    const res = await fetch(url, { headers: { accept: "application/json" } });
+    const res = await fetch(url, { headers: authHeaders() });
     if (!res.ok) return null;
 
     const data = await res.json();
@@ -249,89 +261,23 @@ if (!isMarketAreaModalPath) {
     if (isProductLocationPage && slugForGeo) {
       // 1) Try product×location Astro API (contains product + meta)
       try {
-        const res = await fetch(PRODUCT_LOCATION_API, {
-          headers: { accept: "application/json" },
-        });
-
-        if (res.ok) {
-          const json = await res.json();
-          const data: SeoDoc[] = Array.isArray(json?.data)
-            ? json.data
-            : json?.data
-            ? [json.data]
-            : [];
-
+        // Use our new authenticated API client
+        const response = await apiGet(`product-location/${slugForGeo}`);
+        
+        if (response.ok) {
+          const json = await response.json();
+          const data = Array.isArray(json) ? json : json?.data || [];
           if (data.length) {
-            let primary: SeoDoc | null =
-              data.find((doc) => norm(doc?.slug) === slugForGeo) ?? null;
-
-            if (!primary && locationSlug) {
-              primary =
-                data.find(
-                  (doc) => norm(doc?.location?.slug) === norm(locationSlug),
-                ) ?? null;
-            }
-
-            seoDoc = primary ?? data[0];
-            relatedSeoDocs = data.filter((doc) => doc !== seoDoc);
+            seoDoc = data[0];
+            relatedSeoDocs = data.slice(1);
           }
         }
       } catch {
-        seoDoc = null;
-      }
-
-      // 2) Optional: fallback to SEO_DETAIL_API if product-location API returns nothing
-      if (!seoDoc) {
-        const countryForApi = countrySlug || geo.countrySlug || "india";
-
-        const detailUrl = new URL(
-          `${SEO_DETAIL_API}/${encodeURIComponent(
-            slugForGeo,
-          )}/${encodeURIComponent(countryForApi)}`,
-        );
-
-        if (stateSlug) detailUrl.searchParams.set("state", stateSlug);
-        if (citySlug) detailUrl.searchParams.set("city", citySlug);
-        if (locationSlug)
-          detailUrl.searchParams.set("location", locationSlug);
-
-        const res = await fetch(detailUrl.toString(), {
-          headers: { accept: "application/json" },
-        });
-
-        if (res.ok) {
-          const json = await res.json();
-          const data: SeoDoc[] = Array.isArray(json?.data)
-            ? json.data
-            : json?.data
-            ? [json.data]
-            : [];
-
-          if (data.length) {
-            let primary: SeoDoc | null = null;
-
-            if (locationSlug) {
-              primary =
-                data.find(
-                  (doc) => norm(doc?.location?.slug) === locationSlug,
-                ) ?? null;
-            }
-
-            if (!primary && citySlug) {
-              primary =
-                data.find(
-                  (doc) => norm(doc?.location?.city?.name) === citySlug,
-                ) ?? null;
-            }
-
-            seoDoc = primary ?? data[0];
-            relatedSeoDocs = data.filter((doc) => doc !== seoDoc);
-          }
-        }
+        // ignore and fallback
       }
     } else {
       // City / generic pages: SEO_PUBLIC_API with path + GEO info
-      const url = new URL(SEO_PUBLIC_API);
+      const url = new URL(`${import.meta.env.PUBLIC_API_BASE_URL}/seo`);
       url.searchParams.set("path", reqUrl.pathname.replace(/\/+$/, "") || "/");
       url.searchParams.set("mode", isCityPage ? "city" : "generic");
 
@@ -342,12 +288,11 @@ if (!isMarketAreaModalPath) {
         url.searchParams.set("location", geo.areaSlug);
       }
 
-      const res = await fetch(url.toString(), {
-        headers: { accept: "application/json" },
-      });
-
-      if (res.ok) {
-        const json = await res.json();
+      // Use our new authenticated API client for SEO data
+      const response = await apiGet(`seo${url.search}`);
+      
+      if (response.ok) {
+        const json = await response.json();
         const data: SeoDoc[] = Array.isArray(json?.data)
           ? json.data
           : json?.data
@@ -397,10 +342,11 @@ const extractFirstProduct = (json: any): ProductDoc | null => {
 const productSlugFromSeo =
   seoDoc?.product?.slug ? norm(seoDoc.product.slug) : undefined;
 
-const currentSlug = productSlugFromSeo
-  ? productSlugFromSeo
-  : productSlugFromUrl ||
-    (!isCityPage ? (segments[0] ?? "").toLowerCase() : FALLBACK_PRODUCT_SLUG);
+const currentSlug =
+  productSlugFromSeo ||
+  (productSlugFromUrl ? norm(productSlugFromUrl) : "") ||
+  (seoDoc?.slug ? norm(seoDoc.slug) : "") ||
+  (!isCityPage && segments[0] ? norm(segments[0]) : "");
 
 if (!isMarketAreaModalPath) {
   try {
@@ -415,12 +361,10 @@ if (!isMarketAreaModalPath) {
       // 1) Try by product ID from SEO document (seoDoc.product = "6931...")
       if (seoDoc?.product && typeof seoDoc.product === "string") {
         try {
-          const byIdRes = await fetch(
-            `${PRODUCT_API}/${encodeURIComponent(seoDoc.product)}`,
-            { headers: { accept: "application/json" } },
-          );
-          if (byIdRes.ok) {
-            const json = await byIdRes.json();
+          // Use our new authenticated API client
+          const byIdResponse = await apiGet(`product/${encodeURIComponent(seoDoc.product)}`);
+          if (byIdResponse.ok) {
+            const json = await byIdResponse.json();
             productDoc = extractFirstProduct(json);
           }
         } catch {
@@ -429,15 +373,12 @@ if (!isMarketAreaModalPath) {
       }
 
       // 2) Fallback – try by slug (e.g. silky-denim-55-ozs)
-      if (!productDoc && currentSlug && currentSlug !== FALLBACK_PRODUCT_SLUG) {
+      if (!productDoc && currentSlug) {
         try {
-          const url = new URL(PRODUCT_API);
-          url.searchParams.set("slug", currentSlug);
-          const bySlugRes = await fetch(url.toString(), {
-            headers: { accept: "application/json" },
-          });
-          if (bySlugRes.ok) {
-            const json = await bySlugRes.json();
+          // Use our new authenticated API client
+          const bySlugResponse = await apiGet(`product?slug=${currentSlug}`);
+          if (bySlugResponse.ok) {
+            const json = await bySlugResponse.json();
             productDoc = extractFirstProduct(json);
           }
         } catch {
@@ -534,9 +475,7 @@ type OfficeInfo = {
 
 let officeDoc: OfficeInfo | null = null;
 try {
-  const res = await fetch(OFFICE_INFO_API, {
-    headers: { accept: "application/json" },
-  });
+  const res = await fetch(OFFICE_INFO_API, { headers: authHeaders() });
   if (res.ok) {
     const json = await res.json();
     const data = Array.isArray(json?.data) ? json.data : [];
@@ -765,13 +704,8 @@ const structuredDataJson = structuredData
 
       {isCityPage ? (
         <OverviewSection
-          heading="Leading B2B Fabric Supplier Worldwide"
-          tagline="ISO 9001 Certified • 500+ Global Partners • Ships to 50+ Countries"
-          image={OVERVIEW_IMG}
-          imageAlt="Premium textile manufacturing"
-        >
-          <CommitmentText slot="extra" />
-        </OverviewSection>
+          currentSlug={currentSlug}
+        />
       ) : (
         <OverviewSection currentSlug={currentSlug} />
       )}

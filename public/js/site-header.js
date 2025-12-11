@@ -416,11 +416,51 @@
     API_BASE = window.env.PUBLIC_API_BASE_URL;
   }
 
+  // Simple function to create headers with authentication
+  function createAuthHeaders() {
+    // In a client-side context, we can only use what's exposed to window.env
+    const headers = {
+      'Accept': 'application/json'
+    };
+
+    // Add API key if available
+    if (typeof window !== 'undefined' && window.env && window.env.PUBLIC_API_KEY) {
+      const apiKeyHeader = window.env.PUBLIC_API_KEY_HEADER || 'x-api-key';
+      headers[apiKeyHeader] = window.env.PUBLIC_API_KEY;
+    }
+
+    // Add admin email if available
+    if (typeof window !== 'undefined' && window.env && window.env.PUBLIC_ADMIN_EMAIL) {
+      const adminEmailHeader = window.env.PUBLIC_ADMIN_EMAIL_HEADER || 'x-admin-email';
+      headers[adminEmailHeader] = window.env.PUBLIC_ADMIN_EMAIL;
+    }
+
+    return headers;
+  }
+
+  // Updated fetch function with authentication
+  async function fetchWithAuth(endpoint, options = {}) {
+    const url = `${API_BASE}/${endpoint}`.replace(/\/+/g, '/'); // Normalize URL
+    
+    // Merge auth headers with any provided headers
+    const authHeaders = createAuthHeaders();
+    const mergedHeaders = {
+      ...authHeaders,
+      ...options.headers || {}
+    };
+
+    // Create the final options object
+    const fetchOptions = {
+      ...options,
+      headers: mergedHeaders
+    };
+
+    return fetch(url, fetchOptions);
+  }
+
   async function fetchCountries() {
     try {
-      const response = await fetch(
-        `${API_BASE}/countries`
-      );
+      const response = await fetchWithAuth('countries');
       if (!response.ok) throw new Error("Failed to fetch countries");
       const json = await response.json();
       countries = Array.isArray(json)
@@ -441,7 +481,7 @@
 
   async function fetchStates() {
     try {
-      const response = await fetch(`${API_BASE}/states`);
+      const response = await fetchWithAuth('states');
       if (!response.ok) throw new Error("Failed to fetch states");
       const json = await response.json();
 
@@ -514,7 +554,7 @@
 
   async function fetchCities() {
     try {
-      const response = await fetch(`${API_BASE}/cities`);
+      const response = await fetchWithAuth('cities');
       if (!response.ok) throw new Error("Failed to fetch cities");
       const json = await response.json();
 

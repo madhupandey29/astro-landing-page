@@ -72,9 +72,18 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Create
     const API_BASE = import.meta.env.PUBLIC_API_BASE_URL;
+    // Import our new API client
+    // Note: We're using direct fetch here since this is a server-side API route
+    // that forwards requests to the backend API with authentication
     const upstream = await fetch(`${API_BASE}/contacts`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: { 
+        "Content-Type": "application/json", 
+        Accept: "application/json",
+        ...(import.meta.env.PUBLIC_API_KEY ? { 
+          [import.meta.env.PUBLIC_API_KEY_HEADER || 'x-api-key']: import.meta.env.PUBLIC_API_KEY 
+        } : {})
+      },
       body: JSON.stringify(body),
     });
 
@@ -91,7 +100,13 @@ export const POST: APIRoute = async ({ request }) => {
     if (id) {
       await fetch(`${API_BASE}/contacts/${encodeURIComponent(id)}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        headers: { 
+          "Content-Type": "application/json", 
+          Accept: "application/json",
+          ...(import.meta.env.PUBLIC_API_KEY ? { 
+            [import.meta.env.PUBLIC_API_KEY_HEADER || 'x-api-key']: import.meta.env.PUBLIC_API_KEY 
+          } : {})
+        },
         body: JSON.stringify(body),
       }).catch(() => null);
     }

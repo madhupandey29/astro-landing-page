@@ -73,12 +73,40 @@ const currentSlugNorm = norm(currentSlug);
 let heroSeo: any = seoDoc ?? null;
 let heroProduct: any = productFromSeo ?? null;
 
-// Fallback: if not provided from parent, fetch from SEO API using slug
+const API_BASE = import.meta.env.PUBLIC_API_BASE_URL || "";
+const apiKey = import.meta.env.PUBLIC_API_KEY;
+const apiKeyHeader = import.meta.env.PUBLIC_API_KEY_HEADER || "x-api-key";
+const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL;
+const adminEmailHeader =
+  import.meta.env.PUBLIC_ADMIN_EMAIL_HEADER || "x-admin-email";
+
+const buildHeaders = () => {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (apiKey) headers[apiKeyHeader] = apiKey;
+  if (adminEmail) headers[adminEmailHeader] = adminEmail;
+  return headers;
+};
+
+const pickFirstProduct = (json: any): any | null => {
+  const fromData = Array.isArray(json?.data)
+    ? json.data
+    : json?.data
+    ? [json.data]
+    : null;
+  const fromProducts = Array.isArray(json?.products)
+    ? json.products
+    : null;
+  const asArray = Array.isArray(json) ? json : null;
+
+  const list = fromData || fromProducts || asArray || [];
+  return list.length ? list[0] : null;
+};
+
+// Fallback: if not provided from parent, fetch from SEO API using slug (with auth)
 if (!heroSeo || !heroProduct) {
   try {
-    const seoResponse = await fetch(seoApi, {
-      headers: { Accept: "application/json" },
-    });
+    const headers = buildHeaders();
+    const seoResponse = await fetch(seoApi, { headers });
 
     if (seoResponse.ok) {
       const seoData = await seoResponse.json();
@@ -101,18 +129,71 @@ if (!heroSeo || !heroProduct) {
             const seoSlug = s?.slug ? norm(s.slug) : "";
             return productSlug === actualSlug || seoSlug === actualSlug;
           }) || null;
+      } else if (seoRows.length) {
+        // Home page fallback: take first entry
+        heroSeo = seoRows[0];
+      }
 
-        // If we found SEO data, get the product from it
-        if (heroSeo?.product) {
-          heroProduct =
-            typeof heroSeo.product === "object"
-              ? heroSeo.product
-              : { _id: heroSeo.product };
-        }
+      // If we found SEO data, get the product from it
+      if (heroSeo?.product) {
+        heroProduct =
+          typeof heroSeo.product === "object"
+            ? heroSeo.product
+            : { _id: heroSeo.product };
       }
     }
   } catch (error) {
     console.error("Error fetching SEO data in ProductHero:", error);
+  }
+}
+
+// If we only have a bare product id, fetch full product details
+if (
+  heroProduct &&
+  Object.keys(heroProduct).length <= 1 &&
+  heroProduct._id &&
+  API_BASE
+) {
+  try {
+    const res = await fetch(
+      `${API_BASE.replace(/\/+$/, "")}/product/${encodeURIComponent(
+        heroProduct._id
+      )}`,
+      { headers: buildHeaders() }
+    );
+    if (res.ok) {
+      const json = await res.json();
+      const parsed = pickFirstProduct(json);
+      if (parsed) heroProduct = parsed;
+    }
+  } catch (err) {
+    // leave heroProduct as-is if fetch fails
+  }
+}
+
+// If product is still missing key display fields, try fetching by slug as a fallback
+if (
+  API_BASE &&
+  (!heroProduct ||
+    (!heroProduct.image1 && !heroProduct.image2 && !heroProduct.image3))
+) {
+  const slugToFetch = currentSlugNorm || currentSlug;
+  if (slugToFetch) {
+    try {
+      const res = await fetch(
+        `${API_BASE.replace(/\/+$/, "")}/product?slug=${encodeURIComponent(
+          slugToFetch
+        )}`,
+        { headers: buildHeaders() }
+      );
+      if (res.ok) {
+        const json = await res.json();
+        const parsed = pickFirstProduct(json);
+        if (parsed) heroProduct = parsed;
+      }
+    } catch (err) {
+      // ignore
+    }
   }
 }
 

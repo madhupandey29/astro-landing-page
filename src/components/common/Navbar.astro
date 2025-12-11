@@ -166,7 +166,7 @@ const {
   </div>
 </header>
 
-<script is:inline>
+<script is:inline type="module">
   (function () {
     const cb = document.getElementById("nav-open");
     const header = document.querySelector(".site-header");
@@ -205,14 +205,29 @@ const {
     /* ================= Fetching ================= */
 
     // Get API base from environment or use default
-    const API_BASE = import.meta.env.PUBLIC_API_BASE_URL;
+    const API_BASE = (window?.env?.PUBLIC_API_BASE_URL || "").replace(/\/+$/, "");
+    const API_KEY = window?.env?.PUBLIC_API_KEY;
+    const API_KEY_HEADER = window?.env?.PUBLIC_API_KEY_HEADER || "x-api-key";
+    const ADMIN_EMAIL = window?.env?.PUBLIC_ADMIN_EMAIL;
+    const ADMIN_EMAIL_HEADER =
+      window?.env?.PUBLIC_ADMIN_EMAIL_HEADER || "x-admin-email";
 
-    // Fetch countries from API
+    const buildAuthHeaders = () => {
+      const headers = { Accept: "application/json" };
+      if (API_KEY) headers[API_KEY_HEADER] = API_KEY;
+      if (ADMIN_EMAIL) headers[ADMIN_EMAIL_HEADER] = ADMIN_EMAIL;
+      return headers;
+    };
+
+    const apiGet = (endpoint) => {
+      const url = `${API_BASE}/${endpoint}`.replace(/\/+/g, "/");
+      return fetch(url, { method: "GET", headers: buildAuthHeaders() });
+    };
+
+    // Fetch countries from API using our authenticated client
     async function fetchCountries() {
       try {
-        const response = await fetch(
-          `${API_BASE}/countries`
-        );
+        const response = await apiGet('countries');
         if (!response.ok) throw new Error("Failed to fetch countries");
         const json = await response.json();
         countries = Array.isArray(json)
@@ -235,12 +250,10 @@ const {
       }
     }
 
-    // Fetch states from API and build map
+    // Fetch states from API and build map using our new authenticated client
     async function fetchStates() {
       try {
-        const response = await fetch(
-          `${API_BASE}/states`
-        );
+        const response = await apiGet('states');
         if (!response.ok) throw new Error("Failed to fetch states");
         const json = await response.json();
 
@@ -257,8 +270,7 @@ const {
             st.name || st.stateName || st.state || st.title || st.label;
           if (!name) return;
 
-          // Try to guess country ISO code from different shapes
-          let code =
+          let countryCode =
             (st.country &&
               (st.country.code ||
                 st.country.code2 ||
@@ -267,32 +279,21 @@ const {
                 st.country.slug)) ||
             st.countryCode ||
             st.country_code ||
-            st.country ||
             "";
 
-          if (typeof code === "object" && code) {
-            code =
-              code.code ||
-              code.code2 ||
-              code.iso2 ||
-              code.isoCode ||
-              code.slug ||
+          if (typeof countryCode === "object" && countryCode) {
+            countryCode =
+              countryCode.code ||
+              countryCode.code2 ||
+              countryCode.iso2 ||
+              countryCode.isoCode ||
+              countryCode.slug ||
               "";
           }
 
-          code = (code || "").toUpperCase();
-          if (!code || code.length !== 2) return;
-
-          const slug =
-            st.slug ||
-            st.stateSlug ||
-            String(name)
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, "-")
-              .replace(/(^-|-$)/g, "");
-
-          if (!statesByCountry[code]) statesByCountry[code] = [];
-          statesByCountry[code].push({ name, slug });
+          const key = `${countryCode}-${name}`.toLowerCase();
+          if (!statesByCountry[countryCode]) statesByCountry[countryCode] = [];
+          statesByCountry[countryCode].push({ ...st, key, name });
         });
 
         renderStateList();

@@ -5,14 +5,28 @@ const { cityCode } = Astro.props;
 /* ===== Helpers & API (unchanged) ===== */
 const norm = (s: any) => String(s ?? '').trim().toLowerCase();
 const toId = (v: any) => (typeof v === 'string' ? v.trim() : v?._id ? String(v._id).trim() : '');
-async function fetchJson(url: string) { try { const r = await fetch(url,{headers:{Accept:'application/json'}}); if(!r.ok) return null; return await r.json(); } catch { return null; } }
+
+// Import our new API client
+import { apiGet } from '../../lib/api-client';
+
+// Updated fetch function using our new authenticated client
+async function fetchJson(endpoint: string) { 
+  try { 
+    const response = await apiGet(endpoint);
+    if(!response.ok) return null; 
+    return await response.json(); 
+  } catch { 
+    return null; 
+  } 
+}
+
 function cityTokenInSlug(slug: string, city: string) { const c = norm(city).replace(/\s+/g, '-'); const re = new RegExp(`(^|-)${c}(-|$)`, 'i'); return re.test(String(slug||'').toLowerCase()); }
 
 const API_ROOT = (import.meta.env.PUBLIC_API_BASE_URL).replace(/\/+$/, '');
 const [seoJson, prodJson, locJson] = await Promise.all([
-  fetchJson(`${API_ROOT}/seo`),
-  fetchJson(`${API_ROOT}/product`),
-  fetchJson(`${API_ROOT}/locations`),
+  fetchJson('seo'),
+  fetchJson('product'),
+  fetchJson('locations'),
 ]);
 
 const seos: any[] = Array.isArray(seoJson?.data) ? seoJson.data : [];
@@ -482,4 +496,3 @@ const stars = Math.max(0, Math.min(5, Math.round(rating || 0)));
   .cta{ flex-direction: column; }
   .img-card{ max-width: 100%; }
 }
-</style>

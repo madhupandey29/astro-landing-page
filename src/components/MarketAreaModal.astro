@@ -1,7 +1,25 @@
-<script>
+<script type="module">
 // @ts-nocheck
   /* ---------- API Endpoints ---------- */
-  const API_BASE = import.meta.env.PUBLIC_API_BASE_URL;
+  const API_BASE = (window?.env?.PUBLIC_API_BASE_URL || "").replace(/\/+$/, "");
+  const API_KEY = window?.env?.PUBLIC_API_KEY;
+  const API_KEY_HEADER = window?.env?.PUBLIC_API_KEY_HEADER || "x-api-key";
+  const ADMIN_EMAIL = window?.env?.PUBLIC_ADMIN_EMAIL;
+  const ADMIN_EMAIL_HEADER =
+    window?.env?.PUBLIC_ADMIN_EMAIL_HEADER || "x-admin-email";
+
+  const buildAuthHeaders = () => {
+    const headers = { Accept: "application/json" };
+    if (API_KEY) headers[API_KEY_HEADER] = API_KEY;
+    if (ADMIN_EMAIL) headers[ADMIN_EMAIL_HEADER] = ADMIN_EMAIL;
+    return headers;
+  };
+
+  const apiGet = (endpoint) => {
+    const url = `${API_BASE}/${endpoint}`.replace(/\/+/g, "/");
+    return fetch(url, { method: "GET", headers: buildAuthHeaders() });
+  };
+
   const API = {
     countries: `${API_BASE}/countries`,
     states: `${API_BASE}/states`,
@@ -61,16 +79,18 @@
     return slugify(name);
   }
 
-  async function fetchJson(url) {
+  async function fetchJson(endpoint) {
     isLoading = true;
     updateUI();
     try {
-      const res = await fetch(url, { headers: { Accept: "application/json" } });
-      if (!res.ok) return [];
-      const json = await res.json();
+      // Use our new authenticated API client
+      const response = await apiGet(endpoint);
+      if (!response.ok) return [];
+      const json = await response.json();
 
       // Smartly parse the JSON response structure
       if (Array.isArray(json)) return json;
+
       const data = json?.data;
       if (data && typeof data === "object") {
         if (Array.isArray(data.countries)) return data.countries;
@@ -82,18 +102,10 @@
           if (Array.isArray(data[key])) return data[key];
         }
       }
-      if (json && typeof json === "object") {
-        if (Array.isArray(json.data)) return json.data;
-        if (Array.isArray(json.items)) return json.items;
-        if (Array.isArray(json.countries)) return json.countries;
-        if (Array.isArray(json.states)) return json.states;
-        if (Array.isArray(json.cities)) return json.cities;
-        if (Array.isArray(json.locations)) return json.locations;
-      }
 
       return [];
     } catch (err) {
-      console.error("Error fetching", url, err);
+      console.error(`Error fetching ${endpoint}:`, err);
       return [];
     } finally {
       isLoading = false;

@@ -16,7 +16,7 @@ const trustedLogos = [
 
 /* ========= Fetch officeinformation ========= */
 const API_BASE =
-  import.meta.env.PUBLIC_API_BASE_URL;
+  import.meta.env.PUBLIC_API_BASE_URL ?? 'https://test.amrita-fashions.com';
 
 let officeInfo: any = null;
 
@@ -501,7 +501,6 @@ const year = new Date().getFullYear();
     .age-social{
       display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; align-items:center;
       max-width:100%; overflow:visible; -ms-overflow-style:none; scrollbar-width:none;
-      justify-content: center;
     }
     .age-social::-webkit-scrollbar{ display:none; }
 
@@ -615,7 +614,7 @@ const year = new Date().getFullYear();
       --TEXT_SOFT: rgba(231,237,246,.78);
     }
   </style>
-  <script is:inline>
+  <script is:inline type="module">
     document.addEventListener('DOMContentLoaded', function() {
       const newsletterForm = document.getElementById('newsletterForm');
       const newsletterEmail = document.getElementById('newsletterEmail');
@@ -639,7 +638,11 @@ const year = new Date().getFullYear();
           
           try {
             // Get API base URL from environment
-            const API_BASE = import.meta.env.PUBLIC_API_BASE_URL;
+            const API_BASE = (window?.env?.PUBLIC_API_BASE_URL || 'https://test.amrita-fashions.com').replace(/\/+$/, '');
+            const API_KEY = window?.env?.PUBLIC_API_KEY;
+            const API_KEY_HEADER = window?.env?.PUBLIC_API_KEY_HEADER || 'x-api-key';
+            const ADMIN_EMAIL = window?.env?.PUBLIC_ADMIN_EMAIL;
+            const ADMIN_EMAIL_HEADER = window?.env?.PUBLIC_ADMIN_EMAIL_HEADER || 'x-admin-email';
             
             // Prepare payload for newsletter subscription - matching the API format
             const payload = {
@@ -657,11 +660,16 @@ const year = new Date().getFullYear();
             };
             
             // Submit to contact API
+            const headers = {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            };
+            if (API_KEY) headers[API_KEY_HEADER] = API_KEY;
+            if (ADMIN_EMAIL) headers[ADMIN_EMAIL_HEADER] = ADMIN_EMAIL;
+
             const response = await fetch(`${API_BASE}/contacts`, {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
+              headers,
               body: JSON.stringify(payload)
             });
             

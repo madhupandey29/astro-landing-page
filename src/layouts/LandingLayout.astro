@@ -68,6 +68,17 @@ if (RAW_API_BASE) {
     <!-- Page-level SEO injection (extra meta/OG/Twitter) BEFORE scripts -->
     <slot name="head" />
 
+    <!-- Expose safe env vars for client-side scripts -->
+    <script is:inline type="module">
+      window.env = Object.assign(window.env || {}, {
+        PUBLIC_API_BASE_URL: import.meta.env.PUBLIC_API_BASE_URL,
+        PUBLIC_API_KEY: import.meta.env.PUBLIC_API_KEY,
+        PUBLIC_API_KEY_HEADER: import.meta.env.PUBLIC_API_KEY_HEADER,
+        PUBLIC_ADMIN_EMAIL: import.meta.env.PUBLIC_ADMIN_EMAIL,
+        PUBLIC_ADMIN_EMAIL_HEADER: import.meta.env.PUBLIC_ADMIN_EMAIL_HEADER,
+      });
+    </script>
+
     <!-- Load URL lock from external module (content won't show in View Source) -->
     <link rel="modulepreload" href="/scripts/url-lock.mjs" />
     <script type="module" src="/scripts/url-lock.mjs"></script>

@@ -30,30 +30,20 @@ let RAW_PHONE = String(phone ?? "").trim();
 // If no prop, try to fetch from office information API
 if (!RAW_PHONE) {
   try {
-    // Use environment variable for API base URL
-    const API_BASE = import.meta.env.PUBLIC_API_BASE_URL;
-    const OFFICE_INFO_URL = `${API_BASE}/officeinformation`;
-    
-    console.log(`[WhatsAppFab] Attempting to fetch from: ${OFFICE_INFO_URL}`);
-    
-    // Fetch office information with proper headers
-    const response = await fetch(OFFICE_INFO_URL, {
-      headers: {
-        'Accept': 'application/json'
-      }
-    });
-    
+    // Fetch office information with our new authenticated client
+    const response = await apiGet('officeinformation');
+
     console.log(`[WhatsAppFab] Response status: ${response.status}`);
-    
+
     if (response.ok) {
       const jsonData = await response.json();
       console.log(`[WhatsAppFab] Response data:`, jsonData);
-      
+
       // Check if data exists and has the expected structure
       if (jsonData && Array.isArray(jsonData.data) && jsonData.data.length > 0) {
         const officeInfo = jsonData.data[0];
         console.log(`[WhatsAppFab] Office info:`, officeInfo);
-        
+
         if (officeInfo.whatsappNumber) {
           RAW_PHONE = String(officeInfo.whatsappNumber).trim();
           console.log(`[WhatsAppFab] Successfully extracted WhatsApp number: ${RAW_PHONE}`);

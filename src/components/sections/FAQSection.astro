@@ -18,9 +18,23 @@ const whatsappHref = DIGITS
   : "https://wa.me/919925155141";
 
 // ===== API URLs =====
-const FAQ_API_URL = import.meta.env.PUBLIC_API_BASE_URL + "/faqa";
-const PRODUCT_FAQ_API_URL =
-  import.meta.env.PUBLIC_API_BASE_URL + "/productandlocation/astro/products";
+const API_BASE = import.meta.env.PUBLIC_API_BASE_URL || "";
+const buildHeaders = () => {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  const apiKey = import.meta.env.PUBLIC_API_KEY;
+  const apiKeyHeader = import.meta.env.PUBLIC_API_KEY_HEADER || "x-api-key";
+  const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL;
+  const adminEmailHeader =
+    import.meta.env.PUBLIC_ADMIN_EMAIL_HEADER || "x-admin-email";
+  if (apiKey) headers[apiKeyHeader] = apiKey;
+  if (adminEmail) headers[adminEmailHeader] = adminEmail;
+  return headers;
+};
+
+const FAQ_API_URL = API_BASE ? `${API_BASE}/faqa` : "";
+const PRODUCT_FAQ_API_URL = API_BASE
+  ? `${API_BASE}/productandlocation/astro/products`
+  : "";
 
 type FaqItem = {
   id: string;
@@ -56,86 +70,90 @@ const slugFromUrlNorm = norm(slugFromUrl);
 
 let globalFaqs: FaqItem[] = [];
 
-try {
-  const res = await fetch(FAQ_API_URL);
-  if (res.ok) {
-    const json = await res.json();
-    const data = Array.isArray(json?.data) ? json.data : [];
-    globalFaqs = data.map((item: any) => ({
-      id: String(item._id || Math.random()),
-      questionHtml: cleanHtml(String(item.question || "")),
-      answerHtml: cleanHtml(String(item.answer || "")),
-      source: "global",
-    }));
+if (FAQ_API_URL) {
+  try {
+    const res = await fetch(FAQ_API_URL, { headers: buildHeaders() });
+    if (res.ok) {
+      const json = await res.json();
+      const data = Array.isArray(json?.data) ? json.data : [];
+      globalFaqs = data.map((item: any) => ({
+        id: String(item._id || Math.random()),
+        questionHtml: cleanHtml(String(item.question || "")),
+        answerHtml: cleanHtml(String(item.answer || "")),
+        source: "global",
+      }));
+    }
+  } catch (err) {
+    globalFaqs = [];
   }
-} catch (err) {
-  globalFaqs = [];
 }
 
 /* ========= Product + Location FAQs from productandlocation API ========= */
 
 let combinedProductFaqs: FaqItem[] = [];
 
-try {
-  const res = await fetch(PRODUCT_FAQ_API_URL, {
-    headers: { Accept: "application/json", "Cache-Control": "no-cache" },
-  });
-  if (res.ok) {
-    const json = await res.json();
-    const rows = Array.isArray(json?.data) ? json.data : [];
+if (PRODUCT_FAQ_API_URL) {
+  try {
+    const res = await fetch(PRODUCT_FAQ_API_URL, {
+      headers: { ...buildHeaders(), "Cache-Control": "no-cache" },
+    });
+    if (res.ok) {
+      const json = await res.json();
+      const rows = Array.isArray(json?.data) ? json.data : [];
 
-    // Try to match current slug with row.slug OR row.product.slug
-    const matchedRow =
-      rows.find((row: any) => {
-        const rowSlugNorm = norm(row.slug);
-        const productSlugNorm = norm(row.product?.slug);
-        return (
-          (rowSlugNorm && rowSlugNorm === slugFromUrlNorm) ||
-          (productSlugNorm && productSlugNorm === slugFromUrlNorm)
-        );
-      }) || rows[0];
+      // Try to match current slug with row.slug OR row.product.slug
+      const matchedRow =
+        rows.find((row: any) => {
+          const rowSlugNorm = norm(row.slug);
+          const productSlugNorm = norm(row.product?.slug);
+          return (
+            (rowSlugNorm && rowSlugNorm === slugFromUrlNorm) ||
+            (productSlugNorm && productSlugNorm === slugFromUrlNorm)
+          );
+        }) || rows[0];
 
-    if (matchedRow) {
-      const product: any = matchedRow.product || {};
-      const location: any = matchedRow.location || {};
+      if (matchedRow) {
+        const product: any = matchedRow.product || {};
+        const location: any = matchedRow.location || {};
 
-      // Product Q&A: productquestion1..6 / productanswer1..6
-      for (let i = 1; i <= 6; i++) {
-        const qKey = `productquestion${i}`;
-        const aKey = `productanswer${i}`;
-        const q = product[qKey];
-        const a = product[aKey];
+        // Product Q&A: productquestion1..6 / productanswer1..6
+        for (let i = 1; i <= 6; i++) {
+          const qKey = `productquestion${i}`;
+          const aKey = `productanswer${i}`;
+          const q = product[qKey];
+          const a = product[aKey];
 
-        if (q && a && String(q).trim() && String(a).trim()) {
-          combinedProductFaqs.push({
-            id: `product-${matchedRow._id}-${i}`,
-            questionHtml: cleanHtml(String(q)),
-            answerHtml: cleanHtml(String(a)),
-            source: "product",
-          });
+          if (q && a && String(q).trim() && String(a).trim()) {
+            combinedProductFaqs.push({
+              id: `product-${matchedRow._id}-${i}`,
+              questionHtml: cleanHtml(String(q)),
+              answerHtml: cleanHtml(String(a)),
+              source: "product",
+            });
+          }
         }
-      }
 
-      // Location Q&A: locationquestion1..6 / locationanswer1..6
-      for (let i = 1; i <= 6; i++) {
-        const qKey = `locationquestion${i}`;
-        const aKey = `locationanswer${i}`;
-        const q = location[qKey];
-        const a = location[aKey];
+        // Location Q&A: locationquestion1..6 / locationanswer1..6
+        for (let i = 1; i <= 6; i++) {
+          const qKey = `locationquestion${i}`;
+          const aKey = `locationanswer${i}`;
+          const q = location[qKey];
+          const a = location[aKey];
 
-        if (q && a && String(q).trim() && String(a).trim()) {
-          combinedProductFaqs.push({
-            id: `location-${matchedRow._id}-${i}`,
-            questionHtml: cleanHtml(String(q)),
-            answerHtml: cleanHtml(String(a)),
-            source: "location",
-          });
+          if (q && a && String(q).trim() && String(a).trim()) {
+            combinedProductFaqs.push({
+              id: `location-${matchedRow._id}-${i}`,
+              questionHtml: cleanHtml(String(q)),
+              answerHtml: cleanHtml(String(a)),
+              source: "location",
+            });
+          }
         }
       }
     }
+  } catch (err) {
+    combinedProductFaqs = [];
   }
-} catch (err) {
-  combinedProductFaqs = [];
 }
 
 /* ========= Final list: product/location FAQs first, then global ========= */
