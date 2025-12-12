@@ -1,5 +1,8 @@
 ---
-/* src/components/sections/Testimonials.astro */
+/* src/components/sections/Testimonials.astro
+   ✅ Fetches location dynamically from your API using ONLY `endpoint`
+   ✅ Base URL + headers come from ENV
+*/
 
 type TItem = {
   id: number;
@@ -10,13 +13,125 @@ type TItem = {
   tags: string[];
 };
 
+type ApiLocation = {
+  name?: string;
+  slug?: string;
+  city?: { name?: string };
+  state?: { name?: string; code?: string };
+  country?: { name?: string; code?: string };
+};
+
 interface Props {
-  /** Optional location, e.g. "Maharashtra", "Mumbai", "Jaipur, RJ" */
+  /** Pass ONLY endpoint like: "/productandlocation/astro/products" */
+  endpoint?: string;
+
+  /** Optional manual override (used only if API has no location) */
   locationName?: string;
 }
 
-const { locationName } = Astro.props as Props;
+const {
+  endpoint = "/productandlocation/astro/products",
+  locationName,
+} = Astro.props as Props;
 
+/* ===== ENV (base + auth) ===== */
+const RAW_BASE = String(import.meta.env.PUBLIC_API_BASE_URL || "").replace(/\/+$/, ""); // e.g. https://test.amrita-fashions.com/api
+const API_KEY = String(import.meta.env.PUBLIC_API_KEY || "");
+const ADMIN_EMAIL = String(import.meta.env.PUBLIC_ADMIN_EMAIL || "");
+
+/* ===== URL join (endpoint-only input) ===== */
+const joinUrl = (base: string, path: string) => {
+  const p = (path || "").trim();
+  if (!p) return base;
+
+  // allow full url if ever passed by mistake
+  if (/^https?:\/\//i.test(p)) return p;
+
+  const ep = p.startsWith("/") ? p : `/${p}`;
+
+  // prevent /api/api duplication if endpoint starts with /api
+  if (base.endsWith("/api") && ep.startsWith("/api/")) return base + ep.slice(4);
+
+  return base ? base + ep : ep;
+};
+
+const API_URL = joinUrl(RAW_BASE, endpoint);
+
+/* ===== Fetch apiLocation from endpoint ===== */
+let apiLocation: ApiLocation | null = null;
+
+try {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (API_KEY) headers["x-api-key"] = API_KEY;
+  if (ADMIN_EMAIL) headers["x-admin-email"] = ADMIN_EMAIL;
+
+  const res = await fetch(API_URL, {
+    method: "GET",
+    headers,
+    cache: "no-store",
+  });
+
+  if (res.ok) {
+    const json = await res.json();
+    apiLocation = json?.data?.[0]?.location ?? null;
+  }
+} catch {
+  apiLocation = null;
+}
+
+/* ===== Location label helpers ===== */
+const clean = (v: any) => String(v ?? "").trim();
+
+const toTitle = (v: any) =>
+  clean(v)
+    .replace(/[-_]+/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+
+const norm = (v: any) => clean(v).toLowerCase();
+
+/**
+ * Card location:
+ * - If location is STATE-only -> "Maharashtra"
+ * - Else -> "Vasai, MH" (or "Mumbai, MH")
+ */
+const buildCardLocation = (loc: ApiLocation | null) => {
+  if (!loc) return "";
+
+  const locName = toTitle(loc.name);
+  const cityName = toTitle(loc.city?.name);
+  const stateName = toTitle(loc.state?.name);
+  const stateCode = clean(loc.state?.code).toUpperCase();
+
+  const hasCity = !!clean(loc.city?.name);
+
+  // Detect state-only record
+  const isStateOnly =
+    (!!stateName && !!locName && norm(locName) === norm(stateName)) ||
+    (!!stateName && !hasCity && (!locName || norm(locName) === norm(stateName)));
+
+  if (isStateOnly) return stateName || locName; // ✅ only "Maharashtra"
+
+  // Otherwise show most specific + state code
+  const place = locName || cityName || "";
+  if (place && stateCode) return `${place}, ${stateCode}`;
+  if (place && stateName) return `${place}, ${stateName}`;
+  return place || stateName || "";
+};
+
+/** Heading location (prefer state: "Maharashtra") */
+const buildHeadingLocation = (loc: ApiLocation | null) => {
+  const stateName = toTitle(loc?.state?.name);
+  return stateName || buildCardLocation(loc);
+};
+
+/* API wins; fallback to prop only if API empty */
+const cardLocation = buildCardLocation(apiLocation) || clean(locationName);
+const headingLocation = buildHeadingLocation(apiLocation) || clean(locationName);
+
+/* ===== Your existing testimonials data ===== */
 const DATA: TItem[] = [
   {
     id: 1,
@@ -79,19 +194,12 @@ const metrics = [
 
 const TOTAL = ITEMS.length;
 
-/** Use dynamic location (e.g. "Maharashtra") if passed, else item.location */
-const resolveLocation = (itemLocation: string) => {
-  if (locationName && locationName.trim().length > 0) {
-    return locationName.trim();
-  }
-  return itemLocation;
-};
+/** Use API card location if available, else item.location */
+const resolveLocation = (itemLocation: string) =>
+  cardLocation ? cardLocation : itemLocation;
 
 /** Heading suffix: (in Maharashtra) */
-const headingLocationSuffix =
-  locationName && locationName.trim().length > 0
-    ? ` (in ${locationName.trim()})`
-    : "";
+const headingLocationSuffix = headingLocation ? ` (in ${headingLocation})` : "";
 ---
 
 <section
@@ -547,9 +655,9 @@ const headingLocationSuffix =
     .dots .dot {
       width: 8px;
       height: 8px;
-      border-radius: 999px;
       border: none;
       padding: 0;
+      border-radius: 999px;
       background: rgba(255, 255, 255, 0.35);
       cursor: pointer;
       outline: 2px solid transparent;
@@ -591,7 +699,6 @@ const headingLocationSuffix =
 
       activate(0);
 
-      // Click on dot -> scroll to that slide
       dots.forEach((dot, index) => {
         dot.addEventListener("click", () => {
           const target = slides[index];
@@ -604,7 +711,6 @@ const headingLocationSuffix =
         });
       });
 
-      // Observe which slide is most visible to highlight dot
       if (typeof window !== "undefined" && "IntersectionObserver" in window) {
         const observer = new IntersectionObserver(
           (entries) => {
@@ -615,15 +721,11 @@ const headingLocationSuffix =
               }
             });
           },
-          {
-            root: viewport,
-            threshold: 0.6,
-          }
+          { root: viewport, threshold: 0.6 }
         );
 
         slides.forEach((slide) => observer.observe(slide));
       } else {
-        // Fallback: compute manually on scroll
         viewport.addEventListener("scroll", () => {
           const vpRect = viewport.getBoundingClientRect();
           let bestIdx = 0;

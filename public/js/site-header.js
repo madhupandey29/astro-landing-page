@@ -18,9 +18,7 @@
   const countrySearch = document.querySelector(".country-search");
   const flagPlaceholder = document.querySelector(".flag-placeholder");
   const countryCode = document.querySelector(".country-code");
-  const selectedCountryNameEl = document.querySelector(
-    ".selected-country-name"
-  );
+  const selectedCountryNameEl = document.querySelector(".selected-country-name");
   const stateListEl = document.querySelector(".state-list");
   const cityListEl = document.querySelector(".city-list");
   const selectedStateNameEl = document.querySelector(".selected-state-name");
@@ -403,64 +401,51 @@
     locationSearchResults.classList.add("is-open");
   }
 
-  /* ================= Fetching ================= */
+  /* ================= Fetching (FIXED) ================= */
 
-  // Get API base from environment
-  // NOTE: For this to work with environment variables, you need to expose
-  // import.meta.env.PUBLIC_API_BASE_URL to the global window.env object
-  // in your HTML layout:
-  // <script>window.env = { PUBLIC_API_BASE_URL: import.meta.env.PUBLIC_API_BASE_URL };</script>
-  var API_BASE = "";
-  // Attempt to read environment variable in a TS-friendly way
-  if (typeof window !== 'undefined' && window.env && window.env.PUBLIC_API_BASE_URL) {
-    API_BASE = window.env.PUBLIC_API_BASE_URL;
-  }
+  const ENV =
+    typeof window !== "undefined" && window.env ? window.env : {};
 
-  // Simple function to create headers with authentication
+  // ✅ single source of truth
+  const API_BASE = String(ENV.PUBLIC_API_BASE_URL || "").replace(/\/+$/, "");
+
   function createAuthHeaders() {
-    // In a client-side context, we can only use what's exposed to window.env
-    const headers = {
-      'Accept': 'application/json'
-    };
+    const headers = { Accept: "application/json" };
 
-    // Add API key if available
-    if (typeof window !== 'undefined' && window.env && window.env.PUBLIC_API_KEY) {
-      const apiKeyHeader = window.env.PUBLIC_API_KEY_HEADER || 'x-api-key';
-      headers[apiKeyHeader] = window.env.PUBLIC_API_KEY;
+    const apiKey = String(ENV.PUBLIC_API_KEY || "");
+    if (apiKey) {
+      const apiKeyHeader = String(ENV.PUBLIC_API_KEY_HEADER || "x-api-key");
+      headers[apiKeyHeader] = apiKey;
     }
 
-    // Add admin email if available
-    if (typeof window !== 'undefined' && window.env && window.env.PUBLIC_ADMIN_EMAIL) {
-      const adminEmailHeader = window.env.PUBLIC_ADMIN_EMAIL_HEADER || 'x-admin-email';
-      headers[adminEmailHeader] = window.env.PUBLIC_ADMIN_EMAIL;
+    const adminEmail = String(ENV.PUBLIC_ADMIN_EMAIL || "");
+    if (adminEmail) {
+      const adminEmailHeader = String(
+        ENV.PUBLIC_ADMIN_EMAIL_HEADER || "x-admin-email"
+      );
+      headers[adminEmailHeader] = adminEmail;
     }
 
     return headers;
   }
 
-  // Updated fetch function with authentication
+  // ✅ FIX: do NOT use .replace(/\/+/g,'/') on full https:// URLs
   async function fetchWithAuth(endpoint, options = {}) {
-    const url = `${API_BASE}/${endpoint}`.replace(/\/+/g, '/'); // Normalize URL
-    
-    // Merge auth headers with any provided headers
+    if (!API_BASE) {
+      throw new Error("API_BASE is missing (window.env.PUBLIC_API_BASE_URL)");
+    }
+
+    const url = new URL(String(endpoint).replace(/^\/+/, ""), API_BASE + "/").toString();
+
     const authHeaders = createAuthHeaders();
-    const mergedHeaders = {
-      ...authHeaders,
-      ...options.headers || {}
-    };
+    const mergedHeaders = { ...authHeaders, ...(options.headers || {}) };
 
-    // Create the final options object
-    const fetchOptions = {
-      ...options,
-      headers: mergedHeaders
-    };
-
-    return fetch(url, fetchOptions);
+    return fetch(url, { ...options, headers: mergedHeaders });
   }
 
   async function fetchCountries() {
     try {
-      const response = await fetchWithAuth('countries');
+      const response = await fetchWithAuth("countries");
       if (!response.ok) throw new Error("Failed to fetch countries");
       const json = await response.json();
       countries = Array.isArray(json)
@@ -481,7 +466,7 @@
 
   async function fetchStates() {
     try {
-      const response = await fetchWithAuth('states');
+      const response = await fetchWithAuth("states");
       if (!response.ok) throw new Error("Failed to fetch states");
       const json = await response.json();
 
@@ -554,7 +539,7 @@
 
   async function fetchCities() {
     try {
-      const response = await fetchWithAuth('cities');
+      const response = await fetchWithAuth("cities");
       if (!response.ok) throw new Error("Failed to fetch cities");
       const json = await response.json();
 
@@ -1033,9 +1018,7 @@
   function setBodyOffset() {
     const currentVar =
       parseFloat(
-        getComputedStyle(document.documentElement).getPropertyValue(
-          "--header-h"
-        )
+        getComputedStyle(document.documentElement).getPropertyValue("--header-h")
       ) || 96;
     let h = header?.offsetHeight || currentVar;
     if (h < 40) h = currentVar;
@@ -1140,7 +1123,6 @@
       const el = document.getElementById(id);
       if (el) {
         e.preventDefault();
-        // Increase offset to show full heading - navbar height + extra padding
         const offset = (header?.offsetHeight || 96) + 40;
         const top = el.getBoundingClientRect().top + window.scrollY - offset;
 
@@ -1213,10 +1195,18 @@
       onScroll();
       setActiveFor("home");
 
+      if (!API_BASE) {
+        console.error(
+          "Missing PUBLIC_API_BASE_URL. window.env:",
+          typeof window !== "undefined" ? window.env : undefined
+        );
+        return;
+      }
+
       fetchCountries();
       fetchStates();
       fetchCities();
-      
+
       // Initialize mobile location selector
       initMobileLocationSelector();
     },
@@ -1228,29 +1218,28 @@
   }
 
   /* ================= Mobile Location Selector ================= */
-  
+
   function initMobileLocationSelector() {
-    const mobileBackBtn = document.querySelector('.mobile-back-btn');
-    const mobileLocationTrigger = document.querySelector('.m-location-trigger');
+    const mobileBackBtn = document.querySelector(".mobile-back-btn");
+    const mobileLocationTrigger = document.querySelector(".m-location-trigger");
     const mobileMenuMain = document.querySelector('[data-step="main"]');
     const mobileCountriesStep = document.querySelector('[data-step="countries"]');
     const mobileStatesStep = document.querySelector('[data-step="states"]');
     const mobileCitiesStep = document.querySelector('[data-step="cities"]');
-    const mobileNavTitle = document.querySelector('.mobile-nav-title');
-    
-    const mobileCountryList = document.querySelector('.mobile-country-list');
-    const mobileStateList = document.querySelector('.mobile-state-list');
-    const mobileCityList = document.querySelector('.mobile-city-list');
-    const mobileCountrySearch = document.querySelector('.mobile-country-search');
-    
-    const flagPlaceholderMobile = document.querySelector('.flag-placeholder-mobile');
-    const countryCodeMobile = document.querySelector('.country-code-mobile');
-    
-    let currentMobileStep = 'main';
+    const mobileNavTitle = document.querySelector(".mobile-nav-title");
+
+    const mobileCountryList = document.querySelector(".mobile-country-list");
+    const mobileStateList = document.querySelector(".mobile-state-list");
+    const mobileCityList = document.querySelector(".mobile-city-list");
+    const mobileCountrySearch = document.querySelector(".mobile-country-search");
+
+    const flagPlaceholderMobile = document.querySelector(".flag-placeholder-mobile");
+    const countryCodeMobile = document.querySelector(".country-code-mobile");
+
+    let currentMobileStep = "main";
     let mobileSelectedCountry = null;
     let mobileSelectedState = null;
-    
-    // Update mobile flag display
+
     function updateMobileFlag() {
       const flagUrl = getFlagUrl(userCountry);
       if (flagPlaceholderMobile && flagUrl) {
@@ -1260,67 +1249,63 @@
         countryCodeMobile.textContent = userCountry;
       }
     }
-    
-    // Show step
+
     function showStep(step) {
-      // Hide all steps
-      if (mobileMenuMain) mobileMenuMain.style.display = 'none';
-      if (mobileCountriesStep) mobileCountriesStep.style.display = 'none';
-      if (mobileStatesStep) mobileStatesStep.style.display = 'none';
-      if (mobileCitiesStep) mobileCitiesStep.style.display = 'none';
-      
-      // Show current step
+      if (mobileMenuMain) mobileMenuMain.style.display = "none";
+      if (mobileCountriesStep) mobileCountriesStep.style.display = "none";
+      if (mobileStatesStep) mobileStatesStep.style.display = "none";
+      if (mobileCitiesStep) mobileCitiesStep.style.display = "none";
+
       currentMobileStep = step;
-      
-      switch(step) {
-        case 'main':
-          if (mobileMenuMain) mobileMenuMain.style.display = 'flex';
-          if (mobileNavTitle) mobileNavTitle.textContent = 'Menu';
-          if (mobileBackBtn) mobileBackBtn.style.display = 'none';
+
+      switch (step) {
+        case "main":
+          if (mobileMenuMain) mobileMenuMain.style.display = "flex";
+          if (mobileNavTitle) mobileNavTitle.textContent = "Menu";
+          if (mobileBackBtn) mobileBackBtn.style.display = "none";
           break;
-        case 'countries':
-          if (mobileCountriesStep) mobileCountriesStep.style.display = 'flex';
-          if (mobileNavTitle) mobileNavTitle.textContent = 'Select Country';
-          if (mobileBackBtn) mobileBackBtn.style.display = 'inline-flex';
+        case "countries":
+          if (mobileCountriesStep) mobileCountriesStep.style.display = "flex";
+          if (mobileNavTitle) mobileNavTitle.textContent = "Select Country";
+          if (mobileBackBtn) mobileBackBtn.style.display = "inline-flex";
           populateMobileCountries();
           break;
-        case 'states':
-          if (mobileStatesStep) mobileStatesStep.style.display = 'flex';
-          if (mobileNavTitle) mobileNavTitle.textContent = 'Select State';
-          if (mobileBackBtn) mobileBackBtn.style.display = 'inline-flex';
+        case "states":
+          if (mobileStatesStep) mobileStatesStep.style.display = "flex";
+          if (mobileNavTitle) mobileNavTitle.textContent = "Select State";
+          if (mobileBackBtn) mobileBackBtn.style.display = "inline-flex";
           populateMobileStates();
           break;
-        case 'cities':
-          if (mobileCitiesStep) mobileCitiesStep.style.display = 'flex';
-          if (mobileNavTitle) mobileNavTitle.textContent = 'Select City';
-          if (mobileBackBtn) mobileBackBtn.style.display = 'inline-flex';
+        case "cities":
+          if (mobileCitiesStep) mobileCitiesStep.style.display = "flex";
+          if (mobileNavTitle) mobileNavTitle.textContent = "Select City";
+          if (mobileBackBtn) mobileBackBtn.style.display = "inline-flex";
           populateMobileCities();
           break;
       }
     }
-    
-    // Populate mobile countries
+
     function populateMobileCountries() {
       if (!mobileCountryList) return;
-      mobileCountryList.innerHTML = '';
-      
+      mobileCountryList.innerHTML = "";
+
       const sorted = [...countries].sort((a, b) =>
         String(a.name || "").localeCompare(String(b.name || ""))
       );
-      
+
       sorted.forEach((country) => {
         if (!country.code || !country.name) return;
         const code = String(country.code).toUpperCase();
         const slug = slugifyClient(country.slug || country.name);
         const url = getFlagUrl(code);
-        
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'mobile-location-item';
+
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "mobile-location-item";
         btn.innerHTML = `
           <div class="mobile-location-content">
             <span class="mobile-country-flag">
-              ${url ? `<img src="${url}" alt="${country.name} flag" class="flag-img" loading="lazy" width="20" height="15" />` : '🌐'}
+              ${url ? `<img src="${url}" alt="${country.name} flag" class="flag-img" loading="lazy" width="20" height="15" />` : "🌐"}
             </span>
             <span>${country.name}</span>
           </div>
@@ -1328,40 +1313,39 @@
             <path d="M9 18l6-6-6-6"/>
           </svg>
         `;
-        
-        btn.addEventListener('click', () => {
+
+        btn.addEventListener("click", () => {
           mobileSelectedCountry = { code, slug, name: country.name };
           userCountry = code;
           updateMobileFlag();
-          showStep('states');
+          showStep("states");
         });
-        
+
         mobileCountryList.appendChild(btn);
       });
     }
-    
-    // Populate mobile states
+
     function populateMobileStates() {
       if (!mobileStateList || !mobileSelectedCountry) return;
-      
-      const selectedCountryEl = document.querySelector('.mobile-selected-country');
+
+      const selectedCountryEl = document.querySelector(".mobile-selected-country");
       if (selectedCountryEl) {
         selectedCountryEl.textContent = mobileSelectedCountry.name;
       }
-      
-      mobileStateList.innerHTML = '';
+
+      mobileStateList.innerHTML = "";
       const code = mobileSelectedCountry.code;
       const states = (statesByCountry[code] || []).slice().sort((a, b) => a.name.localeCompare(b.name));
-      
+
       if (!states.length) {
         mobileStateList.innerHTML = '<div class="state-empty">No states found for this country.</div>';
         return;
       }
-      
+
       states.forEach((st) => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'mobile-location-item';
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "mobile-location-item";
         btn.innerHTML = `
           <div class="mobile-location-content">
             <span>${st.name}</span>
@@ -1370,105 +1354,100 @@
             <path d="M9 18l6-6-6-6"/>
           </svg>
         `;
-        
-        btn.addEventListener('click', () => {
+
+        btn.addEventListener("click", () => {
           mobileSelectedState = { name: st.name, slug: st.slug, code: st.code };
           currentStateKey = `${code}-${st.code}`;
           currentStateName = st.name;
           currentCountrySlug = mobileSelectedCountry.slug;
           currentStateSlug = st.slug;
-          showStep('cities');
+          showStep("cities");
         });
-        
+
         mobileStateList.appendChild(btn);
       });
     }
-    
-    // Populate mobile cities
+
     function populateMobileCities() {
       if (!mobileCityList || !currentStateKey) return;
-      
-      const selectedStateEl = document.querySelector('.mobile-selected-state');
+
+      const selectedStateEl = document.querySelector(".mobile-selected-state");
       if (selectedStateEl && mobileSelectedState) {
         selectedStateEl.textContent = mobileSelectedState.name;
       }
-      
-      mobileCityList.innerHTML = '';
+
+      mobileCityList.innerHTML = "";
       const cities = (citiesByStateKey[currentStateKey] || []).slice().sort((a, b) => a.name.localeCompare(b.name));
-      
+
       if (!cities.length) {
         mobileCityList.innerHTML = '<div class="city-empty">No cities found for this state.</div>';
         return;
       }
-      
+
       cities.forEach((ct) => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'mobile-location-item';
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "mobile-location-item";
         btn.innerHTML = `
           <div class="mobile-location-content">
             <span>${ct.name}</span>
           </div>
         `;
-        
-        btn.addEventListener('click', () => {
-          const cSlug = currentCountrySlug || urlCountrySlug || '';
-          const sSlug = currentStateSlug || urlStateSlug || '';
-          const citySlug = ct.slug || '';
-          
+
+        btn.addEventListener("click", () => {
+          const cSlug = currentCountrySlug || urlCountrySlug || "";
+          const sSlug = currentStateSlug || urlStateSlug || "";
+          const citySlug = ct.slug || "";
+
           if (cSlug && citySlug) {
             navigateToGeoPage(cSlug, sSlug, citySlug);
-            // Close mobile menu and reset
             if (cb) cb.checked = false;
-            showStep('main');
-            // Reload page to show new location
+            showStep("main");
             setTimeout(() => window.location.reload(), 300);
           }
         });
-        
+
         mobileCityList.appendChild(btn);
       });
     }
-    
-    // Country search filter
+
     if (mobileCountrySearch) {
-      mobileCountrySearch.addEventListener('input', (e) => {
+      mobileCountrySearch.addEventListener("input", (e) => {
         const term = e.target.value.toLowerCase();
-        const items = mobileCountryList.querySelectorAll('.mobile-location-item');
-        items.forEach(item => {
+        const items = mobileCountryList.querySelectorAll(".mobile-location-item");
+        items.forEach((item) => {
           const text = item.textContent.toLowerCase();
-          item.style.display = text.includes(term) ? 'flex' : 'none';
+          item.style.display = text.includes(term) ? "flex" : "none";
         });
       });
     }
-    
-    // Event listeners
+
     if (mobileLocationTrigger) {
-      mobileLocationTrigger.addEventListener('click', () => {
-        showStep('countries');
+      mobileLocationTrigger.addEventListener("click", () => {
+        showStep("countries");
       });
     }
-    
+
     if (mobileBackBtn) {
-      mobileBackBtn.addEventListener('click', () => {
-        switch(currentMobileStep) {
-          case 'countries':
-            showStep('main');
+      mobileBackBtn.addEventListener("click", () => {
+        switch (currentMobileStep) {
+          case "countries":
+            showStep("main");
             break;
-          case 'states':
-            showStep('countries');
+          case "states":
+            showStep("countries");
             break;
-          case 'cities':
-            showStep('states');
+          case "cities":
+            showStep("states");
             break;
         }
       });
     }
-    
-    // Initialize
+
     updateMobileFlag();
   }
 })();
+
 document.addEventListener("DOMContentLoaded", () => {
   const trigger = document.querySelector(".country-trigger");
   const dropdown = document.querySelector(".country-dropdown");

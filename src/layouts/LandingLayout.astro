@@ -17,7 +17,7 @@ const { title, description, canonical } = Astro.props as LayoutProps;
 /**
  * Backend / API origin derived from env
  * Example:
- * PUBLIC_API_BASE_URL = "https://test.amrita-fashions.com/landing"
+ * PUBLIC_API_BASE_URL = "https://test.amrita-fashions.com/api"
  * => API_ORIGIN = "https://test.amrita-fashions.com"
  */
 const RAW_API_BASE = import.meta.env.PUBLIC_API_BASE_URL as string | undefined;
@@ -27,17 +27,26 @@ if (RAW_API_BASE) {
   try {
     API_ORIGIN = new URL(RAW_API_BASE).origin;
   } catch {
-    // Fallback: strip trailing slashes and path if URL constructor fails
     API_ORIGIN = RAW_API_BASE.replace(/\/+$/, "");
   }
 }
+
+/** ✅ Build client-safe env on server, then inject as JSON */
+const clientEnv = {
+  PUBLIC_API_BASE_URL: import.meta.env.PUBLIC_API_BASE_URL ?? "",
+  PUBLIC_API_KEY: import.meta.env.PUBLIC_API_KEY ?? "",
+  PUBLIC_API_KEY_HEADER: import.meta.env.PUBLIC_API_KEY_HEADER ?? "x-api-key",
+  PUBLIC_ADMIN_EMAIL: import.meta.env.PUBLIC_ADMIN_EMAIL ?? "",
+  PUBLIC_ADMIN_EMAIL_HEADER:
+    import.meta.env.PUBLIC_ADMIN_EMAIL_HEADER ?? "x-admin-email",
+};
+const clientEnvJson = JSON.stringify(clientEnv);
 ---
 
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <!-- Viewport default; pages can override in head slot -->
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
@@ -47,10 +56,7 @@ if (RAW_API_BASE) {
     {description && <meta name="description" content={description} />}
     {canonical && <link rel="canonical" href={canonical} />}
 
-    <!-- Favicons -->
     <link rel="icon" href="/favicon.svg" />
-
-    <!-- Non-blocking perf hints -->
 
     {API_ORIGIN && (
       <>
@@ -59,27 +65,19 @@ if (RAW_API_BASE) {
       </>
     )}
 
-    <!-- Cloudinary can stay static or you can move to env later if needed -->
     <link rel="dns-prefetch" href="https://res.cloudinary.com" />
     <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
 
     <meta name="color-scheme" content="light dark" />
 
-    <!-- Page-level SEO injection (extra meta/OG/Twitter) BEFORE scripts -->
     <slot name="head" />
 
-    <!-- Expose safe env vars for client-side scripts -->
-    <script is:inline type="module">
-      window.env = Object.assign(window.env || {}, {
-        PUBLIC_API_BASE_URL: import.meta.env.PUBLIC_API_BASE_URL,
-        PUBLIC_API_KEY: import.meta.env.PUBLIC_API_KEY,
-        PUBLIC_API_KEY_HEADER: import.meta.env.PUBLIC_API_KEY_HEADER,
-        PUBLIC_ADMIN_EMAIL: import.meta.env.PUBLIC_ADMIN_EMAIL,
-        PUBLIC_ADMIN_EMAIL_HEADER: import.meta.env.PUBLIC_ADMIN_EMAIL_HEADER,
-      });
-    </script>
+    <!-- ✅ FIXED: inject env as JSON (no { } expressions inside script body) -->
+    <script
+      is:inline
+      set:html={`window.env = Object.assign(window.env || {}, ${clientEnvJson});`}
+    ></script>
 
-    <!-- Load URL lock from external module (content won't show in View Source) -->
     <link rel="modulepreload" href="/scripts/url-lock.mjs" />
     <script type="module" src="/scripts/url-lock.mjs"></script>
   </head>
@@ -91,7 +89,6 @@ if (RAW_API_BASE) {
       <slot />
     </main>
     <Footer />
-    <!-- Keep PerfBooster at the very end so it can't race the URL lock -->
     <PerfBooster />
 
     <!-- Global smooth scroll handler for all anchor links -->
@@ -106,9 +103,7 @@ if (RAW_API_BASE) {
 
           // Skip if already handled by site-header.js
           if (
-            target.closest(
-              ".nav-links, .mobile-nav, .age-footer, .cta, .m-cta",
-            )
+            target.closest(".nav-links, .mobile-nav, .age-footer, .cta, .m-cta")
           )
             return;
 
