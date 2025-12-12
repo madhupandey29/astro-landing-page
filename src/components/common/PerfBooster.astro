@@ -39,7 +39,7 @@ const {
     "https://test.amrita-fashions.com",
     "https://fonts.googleapis.com",
     "https://fonts.gstatic.com",
-    "https://cdnjs.cloudflare.com"
+    "https://cdnjs.cloudflare.com",
   ],
   lcpSelector = 'img[data-lcp], .hero img, img.hero',
   lcpSrc,
@@ -68,29 +68,20 @@ const {
       fetchpriority="high"
     />
   )}
-
-  <!-- Core viewport and color-scheme are now defined once in the base layout -->
 </astro:head>
 
-<!--
-  Use define:vars to pass containSize into CSS as --containSize.
-  This avoids the CSS syntax error from {{containSize}}.
--->
 <style is:global define:vars={{ containSize }}>
-  /* Skip layout/paint for offscreen blocks until scrolled into view */
   .defer-section,
   [data-defer-section] {
     content-visibility: auto;
-    contain-intrinsic-size: var(--containSize); /* width height placeholder */
+    contain-intrinsic-size: var(--containSize);
   }
 
-  /* Sensible defaults for images (avoid layout shifts) */
   img[loading="lazy"] {
     max-width: 100%;
     height: auto;
   }
 
-  /* Lightweight skeleton utility (opt-in with data-skeleton) */
   [data-skeleton] {
     background: linear-gradient(
       90deg,
@@ -112,13 +103,19 @@ const {
   }
 </style>
 
-<script is:inline>
+<!-- ✅ FIX: inject Astro props into browser script -->
+<script is:inline define:vars={{ lcpSelector, deferCssSelectors }}>
 (() => {
   const ROOT_MARGIN = "300px";
 
-  // Inject server-side values safely into inline JS
-  const LCP_SELECTOR = JSON.parse('{JSON.stringify(lcpSelector)}');
-  const DEFER_CSS_SEL = JSON.parse('{JSON.stringify(deferCssSelectors)}');
+  // These now exist in browser because of define:vars
+  const LCP_SELECTOR = (typeof lcpSelector === "string" && lcpSelector.trim())
+    ? lcpSelector.trim()
+    : 'img[data-lcp], .hero img, img.hero';
+
+  const DEFER_CSS_SEL = (typeof deferCssSelectors === "string" && deferCssSelectors.trim())
+    ? deferCssSelectors.trim()
+    : 'link[data-defer-css], link[href*="fontawesome"]';
 
   // 1) Defer selected non-critical CSS (opt-in) and auto-handle Font Awesome CDN
   const inHeadDeferCSS = () => {
@@ -216,7 +213,7 @@ const {
   const prefetchLink = (a) => {
     if (!a || a.dataset.prefetched) return;
     const href = a.href;
-    if (!href || href.indexOf(location.origin) !== 0) return; // same-origin only
+    if (!href || href.indexOf(location.origin) !== 0) return;
     const l = document.createElement("link");
     l.rel = "prefetch";
     l.href = href;
@@ -261,7 +258,6 @@ const {
         if (nextSrc) {
           const im = new Image();
           im.decoding = "async";
-          // @ts-ignore
           if ("fetchPriority" in im) im.fetchPriority = "low";
           im.src = nextSrc;
           el.removeAttribute("data-next-src");

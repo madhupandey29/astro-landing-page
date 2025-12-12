@@ -11,6 +11,8 @@
  * Those are handled by the main layout using API values passed as props.
  */
 
+import { apiGet } from "../lib/api-client.ts";
+
 interface Props {
   seo?: Record<string, any> | null;
   canonical?: string | undefined;
@@ -26,23 +28,59 @@ const DEFAULT_SEO_API = `${API_BASE}/defaultseo`;
 let defaultSeo: Record<string, any> | null = null;
 
 try {
+  console.log("[HeadSEO] Attempting to fetch default SEO from:", DEFAULT_SEO_API);
   const res = await fetch(DEFAULT_SEO_API, {
     headers: { accept: "application/json" },
   });
 
+  console.log("[HeadSEO] Default SEO response status:", res.status);
   if (res.ok) {
     const json = await res.json();
+    console.log("[HeadSEO] Default SEO response data:", json);
 
     if (Array.isArray(json) && json.length > 0) {
       defaultSeo = json[0];
-    } else if (Array.isArray(json?.data) && json.data.length > 0) {
-      defaultSeo = json.data[0];
+    } else if (Array.isArray((json as any)?.data) && (json as any).data.length > 0) {
+      defaultSeo = (json as any).data[0];
     } else {
       defaultSeo = json;
     }
+    console.log("[HeadSEO] Processed defaultSeo:", defaultSeo);
+  } else {
+    console.error("[HeadSEO] Failed to fetch default SEO, status:", res.status);
   }
-} catch {
+} catch (error) {
+  console.error("[HeadSEO] Error fetching default SEO:", error);
   defaultSeo = null;
+}
+
+/* ========= Office Information API (for GA and Clarity IDs) ========= */
+
+let officeInfo: Record<string, any> | null = null;
+
+try {
+  if (API_BASE) {
+    console.log("[HeadSEO] Attempting to fetch office information");
+    const response = await apiGet("officeinformation");
+    console.log("[HeadSEO] Office info response status:", response.status);
+    if (response.ok) {
+      const json = await response.json();
+      console.log("[HeadSEO] Office info response data:", json);
+      officeInfo = Array.isArray((json as any)?.data) && (json as any).data.length > 0 ? (json as any).data[0] : null;
+      console.log("[HeadSEO] Processed officeInfo:", officeInfo);
+      console.log("[HeadSEO] officeInfo.gaId:", officeInfo?.gaId);
+      console.log("[HeadSEO] officeInfo.gaid:", officeInfo?.gaid);
+      console.log("[HeadSEO] officeInfo.clarityId:", officeInfo?.clarityId);
+      console.log("[HeadSEO] officeInfo.clarityid:", officeInfo?.clarityid);
+    } else {
+      console.error("[HeadSEO] Failed to fetch office info, status:", response.status);
+    }
+  } else {
+    console.warn("[HeadSEO] API_BASE is not defined");
+  }
+} catch (error) {
+  console.error("[HeadSEO] Error fetching office info:", error);
+  officeInfo = null;
 }
 
 /* ========= Helpers ========= */
@@ -79,41 +117,32 @@ const pickSeo = (...keys: string[]) => {
 
 /* ========= Resolved meta values (APIs only) ========= */
 
-const title       = asText(pickSeo("title"));
+const title = asText(pickSeo("title"));
 const description = asText(pickSeo("description"));
 
-const keywords    = asText(pickSeo("keywords"));
-const robots      = asText(pickSeo("robots"));
+const keywords = asText(pickSeo("keywords"));
+const robots = asText(pickSeo("robots"));
 
-const author      = asText(pickSeo("author_name", "authorname"));
+const author = asText(pickSeo("author_name", "authorname"));
 
-const siteName    = asText(pickSeo("ogSiteName", "ogsitename"));
-const ogType      = asText(pickSeo("ogType", "ogtype"));
-const ogLocale    = asText(pickSeo("ogLocale", "oglocale"));
+const siteName = asText(pickSeo("ogSiteName", "ogsitename"));
+const ogType = asText(pickSeo("ogType", "ogtype"));
+const ogLocale = asText(pickSeo("ogLocale", "oglocale"));
 
-const themeColor  = asText(pickSeo("themeColor", "themecolor"));
-const fmtDetect   = asText(pickSeo("formatDetection", "formatdetection"));
+const themeColor = asText(pickSeo("themeColor", "themecolor"));
+const fmtDetect = asText(pickSeo("formatDetection", "formatdetection"));
 
-const gVerify     = asText(
-  pickSeo("googleSiteVerification", "googlesiteverification")
-);
+const gVerify = asText(pickSeo("googleSiteVerification", "googlesiteverification"));
 
-const msValidate  = asText(
-  pickSeo("msValidate", "microsofttoken")
-);
+const msValidate = asText(pickSeo("msValidate", "microsofttoken"));
 
-const appleStatus = asText(
-  pickSeo("appleStatusBarStyle", "applestatusbarstyle")
-);
+const appleStatus = asText(pickSeo("appleStatusBarStyle", "applestatusbarstyle"));
 
-const mobileCap   = asText(
-  pickSeo("mobileWebAppCapable", "mobilewebappcapable")
-);
+const mobileCap = asText(pickSeo("mobileWebAppCapable", "mobilewebappcapable"));
 
 /* Twitter */
-
-const twitterCard  = asText(pickSeo("twitterCard", "twittercard"));
-const twitterSite  = asText(pickSeo("twitterSite", "twittersite"));
+const twitterCard = asText(pickSeo("twitterCard", "twittercard"));
+const twitterSite = asText(pickSeo("twitterSite", "twittersite"));
 
 /**
  * For Twitter title/description:
@@ -126,31 +155,65 @@ const twitterTitle = asText(rawTwitterTitle ?? title);
 const rawTwitterDesc = pickSeo("twitterDescription", "twitterdescription");
 const twitterDesc = asText(rawTwitterDesc ?? description);
 
-const twitterPlayer = asText(
-  pickSeo("twitterPlayer", "twitterplayer")
-);
+const twitterPlayer = asText(pickSeo("twitterPlayer", "twitterplayer"));
 
 const tpW = asNumber(pickSeo("twitterPlayerWidth", "twitterplayerwidth"));
 const tpH = asNumber(pickSeo("twitterPlayerHeight", "twitterplayerheight"));
 
 /* OG video */
-
 const ogVideoType = asText(pickSeo("ogVideoType", "ogvideotype"));
-const ogVideoW    = asNumber(pickSeo("ogVideoWidth", "ogvideowidth"));
-const ogVideoH    = asNumber(pickSeo("ogVideoHeight", "ogvideoheight"));
+const ogVideoW = asNumber(pickSeo("ogVideoWidth", "ogvideowidth"));
+const ogVideoH = asNumber(pickSeo("ogVideoHeight", "ogvideoheight"));
 
-/* Optional analytics IDs (still from API) */
-const gaId       = pickSeo("gaId", "gaid");
-const clarityId  = pickSeo("clarityId", "clarityid");
+/* ✅ Analytics IDs (OFFICEINFO FIRST, then fallback to SEO/default) */
+const gaCandidate =
+  officeInfo?.gaId ||
+  officeInfo?.gaid ||
+  pickSeo("gaId", "gaid");
+
+const clarityCandidate =
+  officeInfo?.clarityId ||
+  officeInfo?.clarityid ||
+  pickSeo("clarityId", "clarityid");
+
+const normalizeGaId = (v: any) => {
+  const s = String(v ?? "").trim();
+  return /^G-[A-Z0-9]+$/i.test(s) ? s : null;
+};
+
+const normalizeClarityId = (v: any) => {
+  let s = String(v ?? "").trim();
+  if (!s) return null;
+
+  // if someone pasted full URL, keep only the tail
+  s = s.replace(/^https?:\/\/(www\.)?clarity\.ms\/tag\//i, "");
+
+  // remove wrong prefix like "clarity-xxxxx"
+  s = s.replace(/^clarity[-_]/i, "");
+
+  // keep only alphanumeric (clarity project id is simple)
+  s = s.replace(/[^a-z0-9]/gi, "").toLowerCase();
+
+  // your example: t6huzv7k5g (10 chars)
+  return /^[a-z0-9]{8,20}$/.test(s) ? s : null;
+};
+
+const validGaId = normalizeGaId(gaCandidate);
+const validClarityId = normalizeClarityId(clarityCandidate);
+const isValidClarityFormat = !!validClarityId;
+
+/* Debug (server-side logs) */
+console.log("[HeadSEO] gaCandidate:", gaCandidate);
+console.log("[HeadSEO] clarityCandidate:", clarityCandidate);
+console.log("[HeadSEO] validGaId:", validGaId);
+console.log("[HeadSEO] validClarityId:", validClarityId);
 
 /**
  * URL for OG/Twitter:
  * - Use canonical prop if provided (this should come from API).
  * - If not provided, we do NOT invent a URL.
  */
-const urlForMeta = canonical && canonical.trim().length
-  ? canonical.trim()
-  : "";
+const urlForMeta = canonical && canonical.trim().length ? canonical.trim() : "";
 ---
 
 <!-- Title / description / canonical are handled by the main layout using API values -->
@@ -200,24 +263,28 @@ const urlForMeta = canonical && canonical.trim().length
   <meta name="twitter:player:height" content={String(tpH)} />
 )}
 
-{gaId && (
+{validGaId && (
   <>
-    <script async src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}></script>
-    <script is:inline>
-      {`window.dataLayer = window.dataLayer || [];
-function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date());
-gtag('config', '${gaId}');`}
-    </script>
+    <script async src={`https://www.googletagmanager.com/gtag/js?id=${validGaId}`}></script>
+    <script
+      is:inline
+      set:html={
+        "window.dataLayer = window.dataLayer || [];\n" +
+        "function gtag(){dataLayer.push(arguments);}\n" +
+        "gtag('js', new Date());\n" +
+        "gtag('config', '" + validGaId + "');"
+      }
+    ></script>
   </>
 )}
 
-{clarityId && (
-  <script is:inline>
-    {`(function(c,l,a,r,i,t,y){
-c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-})(window, document, "clarity", "script", "${clarityId}");`}
-  </script>
+{validClarityId && isValidClarityFormat && (
+  <script
+    is:inline
+    set:html={`(function(c,l,a,r,i,t,y){
+      c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+      t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+      y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "${validClarityId}");`}
+  ></script>
 )}
