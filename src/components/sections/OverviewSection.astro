@@ -1,6 +1,6 @@
 ---
 /* Static-headed, slug-aware Overview (no CTA, hoverable stat cards) */
-import { apiGet } from '../../lib/api-client';
+import { apiGet } from "../../lib/api-client";
 
 export interface Props {
   currentSlug?: string | null;
@@ -10,14 +10,11 @@ export interface Props {
 
 const { currentSlug = null, seoApi, productApi } = Astro.props;
 
-// Endpoints & headers
-
-// Read env safely (might be undefined on some environments)
+/* ========= Endpoints (kept, even if apiGet uses base internally) ========= */
 const RAW_BASE_ENV = import.meta.env.PUBLIC_API_BASE_URL;
 const RAW_BASE =
   typeof RAW_BASE_ENV === "string" ? RAW_BASE_ENV.replace(/\/+$/, "") : "";
 
-// Build URLs only if we actually have a base or explicit prop
 const SEO_URL = (seoApi || (RAW_BASE ? `${RAW_BASE}/seo` : "") || "").replace(
   /\/+$/,
   ""
@@ -26,14 +23,58 @@ const PRODUCT_URL = (
   productApi || (RAW_BASE ? `${RAW_BASE}/product` : "") || ""
 ).replace(/\/+$/, "");
 
-// Optional debug (won't break anything)
 if (!RAW_BASE) {
   console.warn(
     "[OverviewSection] PUBLIC_API_BASE_URL is missing – Overview will render with fallback content only."
   );
 }
 
-// Updated fetch function using our new authenticated client
+/* ================= Cloudinary responsive helpers =================
+   ✅ Makes srcset REAL by generating different Cloudinary URLs per width
+   ✅ If your stored URL already contains transforms, it rebuilds cleanly from /v123... onwards
+   ✅ Uses c_limit to avoid ugly upscaling (remove c_limit if you WANT upscaling)
+*/
+const cloudParts = (url: string) => {
+  if (!url) return null;
+  if (!url.includes("res.cloudinary.com") || !url.includes("/upload/")) return null;
+
+  const [before, after] = url.split("/upload/");
+
+  // strip any existing transforms by cutting from version segment v123...
+  const m = after.match(/v\d+\//);
+  const rest = m ? after.slice(m.index) : after;
+
+  return { before, rest };
+};
+
+const cloudUrl = (url: string, w: number) => {
+  const p = cloudParts(url);
+  if (!p) return url;
+
+  // NOTE: keep c_limit to prevent upscaling beyond original.
+  // If you want upscaling: remove `c_limit,`
+  return `${p.before}/upload/f_auto,q_auto,c_limit,w_${w}/${p.rest}`;
+};
+
+const buildSrcSet = (url: string) => {
+  const p = cloudParts(url);
+  if (!p) return "";
+
+  // pick sensible widths for your layout
+  const widths = [240, 320, 480, 640, 768, 1024, 1280];
+  return widths.map((w) => `${cloudUrl(url, w)} ${w}w`).join(", ");
+};
+
+// sizes must match your CSS:
+// - <=1024px you set max-width:100% (so it behaves like full width)
+// - >=1024px you float right with inline-size: clamp(320px, 36vw, 520px)
+const IMAGE_SIZES = `
+  (min-width: 1280px) 520px,
+  (min-width: 1024px) 36vw,
+  calc(100vw - 28px)
+`.trim();
+
+/* ================= Data fetch ================= */
 async function fetchJson(endpoint: string) {
   try {
     if (!endpoint) return null;
@@ -45,19 +86,15 @@ async function fetchJson(endpoint: string) {
   }
 }
 
-// Fetch data using our new authenticated client
-const [seoJson, prodJson] = await Promise.all([
-  fetchJson('seo'),
-  fetchJson('product')
-]);
+const [seoJson, prodJson] = await Promise.all([fetchJson("seo"), fetchJson("product")]);
 
-// Process data as before
+/* ================= Process data ================= */
 const seos: any[] = Array.isArray(seoJson?.data) ? seoJson.data : [];
 const products: any[] =
   Array.isArray(prodJson?.data) ? prodJson.data :
   Array.isArray(prodJson?.data?.products) ? prodJson.data.products :
   Array.isArray(prodJson) ? prodJson : [];
-  
+
 const safe = (v: any) => (v == null ? "" : String(v));
 const norm = (s: any) => safe(s).trim().toLowerCase();
 const toId = (v: any) =>
@@ -86,7 +123,7 @@ const pickHtml = (o: any) => {
 
 const cleanHtml = (s: string) => s.replace(/^\s*\.\s*$/gm, "");
 
-// Pick SEO & product
+/* ================= Pick SEO & product ================= */
 function pickSeo() {
   if (!seos.length) return null;
 
@@ -100,7 +137,6 @@ function pickSeo() {
 const seo = pickSeo();
 
 function pickProduct() {
-  // Fixed: Changed 'prods' to 'products' to match the actual variable name
   if (!products.length) return null;
 
   const pid = toId(seo?.product);
@@ -118,25 +154,20 @@ function pickProduct() {
 }
 const product = pickProduct();
 
-// Static heading/tagline
+/* ================= Static heading/tagline ================= */
 const STATIC_HEADING = "Leading B2B Fabric Supplier Worldwide";
-const STATIC_TAGLINE =
-  "ISO 9001 Certified • 500+ Global Partners • Ships to 50+ Countries";
+const STATIC_TAGLINE = "ISO 9001 Certified • 500+ Global Partners • Ships to 50+ Countries";
 
-// Dynamic body + image
+/* ================= Dynamic body + image ================= */
 const p1 = cleanHtml(pickHtml(seo) || pickHtml(product) || "");
-const p2 = cleanHtml(
-  seo?.productlocationdescription2 || product?.productlocationdescription2 || ""
-);
+const p2 = cleanHtml(seo?.productlocationdescription2 || product?.productlocationdescription2 || "");
 
 const image = product?.image2 || product?.image3 || product?.image1 || "";
 const imageAlt = seo?.title || product?.name || "Fabric image";
 
-// simple srcset using same URL (safe even if not Cloudinary)
-const imageSrcSet = image
-  ? `${image} 480w, ${image} 768w, ${image} 1024w, ${image} 1440w`
-  : "";
-
+// ✅ Real Cloudinary responsive src/srcset (falls back safely if not Cloudinary)
+const imageSrc = image ? cloudUrl(image, 640) : "";
+const imageSrcSet = image ? buildSrcSet(image) : "";
 ---
 
 <section class="ov" id="aboutus">
@@ -147,22 +178,19 @@ const imageSrcSet = image
       <i class="bar" aria-hidden="true"></i>
     </header>
 
-    <!-- image BEFORE copy so float/shape can wrap following text -->
     <div class="content">
       {image && (
         <figure class="media wrap-shape" aria-label="Product image">
           <img
-            src={image}
+            src={imageSrc}
             srcset={imageSrcSet}
+            sizes={IMAGE_SIZES}
             alt={imageAlt}
             title={imageAlt}
             loading="lazy"
             decoding="async"
             width="1024"
             height="768"
-            sizes="(max-width: 640px) 100vw,
-                   (max-width: 1024px) 60vw,
-                   640px"
           />
         </figure>
       )}
@@ -219,7 +247,6 @@ const imageSrcSet = image
       border-radius:999px
     }
 
-    /* Mobile/tablet: stacked layout */
     .content{display:grid;gap:1.6rem}
 
     .media{
@@ -241,7 +268,6 @@ const imageSrcSet = image
       object-fit:contain;
     }
 
-    /* Mobile: Match product hero by slug section image sizing */
     @media (max-width: 1024px){
       .media{
         max-width: 100%;
@@ -250,9 +276,7 @@ const imageSrcSet = image
       }
     }
     @media (max-width: 640px){
-      .media{
-        max-width: 100%;
-      }
+      .media{ max-width: 100%; }
     }
 
     .copy{position:relative}
@@ -268,14 +292,8 @@ const imageSrcSet = image
     .txt :where(ul){padding-left:1.1rem}
     .mt{margin-top:1rem}
 
-    /* ===== Stats (3 cards, now responsive with improved mobile layout) ===== */
-    .stats{
-      display:grid;
-      gap:1rem;
-      margin-top:1.5rem;
-    }
+    .stats{display:grid;gap:1rem;margin-top:1.5rem;}
 
-    /* Base card look */
     .stat{
       background:#f0f4f8;
       border:1px solid rgba(17,35,56,.10);
@@ -319,29 +337,14 @@ const imageSrcSet = image
           radial-gradient(100% 100% at 50% 0, rgba(44,76,151,.18), rgba(214,167,75,.16)) border-box;
       }
     }
-    .stat:focus-within{
-      outline:2px solid rgba(44,76,151,.35);
-      outline-offset:2px;
-    }
 
-    /* Mobile: stacked layout, one card per row */
     @media (max-width: 639px){
-      .stats{
-        grid-template-columns:1fr;
-      }
-      .stat{
-        padding:1.1rem 0.75rem;
-        border-radius:16px;
-      }
-      .num{
-        font-size:1.4rem;
-      }
-      .lbl{
-        font-size:0.9rem;
-      }
+      .stats{grid-template-columns:1fr;}
+      .stat{padding:1.1rem 0.75rem;border-radius:16px;}
+      .num{font-size:1.4rem;}
+      .lbl{font-size:0.9rem;}
     }
 
-    /* Tablet & desktop: 3 columns, centered */
     @media (min-width: 640px){
       .stats{
         grid-template-columns:repeat(3,minmax(0,1fr));
@@ -349,35 +352,22 @@ const imageSrcSet = image
         margin-top:1.75rem;
         margin-inline:auto;
       }
-      .stat{
-        padding:1.25rem 1rem;
-      }
-      .num{
-        font-size:1.5rem;
-      }
-      .lbl{
-        font-size:0.95rem;
-      }
+      .stat{padding:1.25rem 1rem;}
+      .num{font-size:1.5rem;}
+      .lbl{font-size:0.95rem;}
     }
 
-    /* ===== Desktop: float image with curved wrapping ===== */
     @media (min-width: 1024px){
-      .content{display:block} /* end the grid; floats need a block formatting context */
+      .content{display:block}
       .wrap-shape{
         inline-size: clamp(320px, 36vw, 520px);
         aspect-ratio: 4 / 3;
         float: right;
-        margin: .25rem 0 1rem 1.6rem; /* space between text and image */
+        margin: .25rem 0 1rem 1.6rem;
         shape-outside: inset(0 round 24px);
-        shape-margin: 14px;   /* extra breathing room between text and curve */
-        clip-path: inset(0 round 22px); /* visually match the curve on the element */
+        shape-margin: 14px;
+        clip-path: inset(0 round 22px);
       }
-      .media img{
-        width:100%;
-        height:100%;
-        object-fit:contain;
-      }
-      /* Clear the float at the end of the text block so following sections don’t wrap */
       .copy:after{content:"";display:block;clear:both}
     }
   </style>
