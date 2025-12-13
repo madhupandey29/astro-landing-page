@@ -5,8 +5,9 @@
 import social_data from "../../data/social-data.ts";
 
 /* ✅ Use secure API client (adds x-api-key + x-admin-email headers) */
-import { apiGet } from "../../lib/api-client.ts";
+import { apiGet } from "../../lib/api-client";
 
+/* Types */
 type Social = { id?: string | number; label?: string; icon?: string; link?: string };
 
 /* Trusted badges (Astro serves /public at the web root) */
@@ -19,38 +20,68 @@ const trustedLogos = [
   { src: "/images/brand/gold.avif",                alt: "Organic Certification" },
 ];
 
+/* ===== Debug logs (server-side) ===== */
+const DEBUG =
+  import.meta.env.DEV ||
+  String(import.meta.env.PUBLIC_DEBUG_LOGS || "").toLowerCase() === "true";
+
+const dlog = (...a: any[]) => DEBUG && console.log("[Footer]", ...a);
+const derr = (...a: any[]) => console.error("[Footer]", ...a);
+
 /* ========= Fetch officeinformation (FIXED: passes headers) ========= */
 let officeInfo: any = null;
 
 try {
+  dlog("officeinformation: request start");
+
   const res = await apiGet("officeinformation", { cache: "no-store" });
+
+  const bodyText = await res.text().catch(() => "");
+  dlog("officeinformation: response", {
+    status: res.status,
+    ok: res.ok,
+    bodyPreview: bodyText.slice(0, 250),
+  });
+
   if (res.ok) {
-    const json = await res.json();
+    let json: any = null;
+    try {
+      json = bodyText ? JSON.parse(bodyText) : null;
+    } catch (e) {
+      derr("officeinformation: JSON parse failed", e);
+    }
+
     officeInfo =
       (Array.isArray(json?.data) && json.data.length ? json.data[0] : null) ??
       (Array.isArray(json) && json.length ? json[0] : null) ??
       null;
+
+    dlog("officeinformation: parsed", {
+      hasOfficeInfo: !!officeInfo,
+      companyName: officeInfo?.companyName,
+    });
   } else {
-    console.error("officeinformation fetch failed", res.status);
+    derr("officeinformation fetch failed", res.status);
   }
 } catch (err) {
-  console.error("Error fetching officeinformation:", err);
+  derr("Error fetching officeinformation:", err);
 }
 
 /* ========= Company / contact fields ========= */
 const fallbackAddress =
   "404, Safal Prelude, Corporate Rd, Prahlad Nagar, Ahmedabad, Gujarat 380015";
 
-const companyName = officeInfo?.companyName ?? "Amrita Global Enterprises";
+const companyName  = officeInfo?.companyName  ?? "Amrita Global Enterprises";
 const companyEmail = officeInfo?.companyEmail ?? "info@amrita-fashions.com";
 
-const phone1Raw = officeInfo?.companyPhone1 ?? "+919925155141";
+const phone1Raw   = officeInfo?.companyPhone1  ?? "+919925155141";
 const whatsappRaw = officeInfo?.whatsappNumber ?? phone1Raw;
 
-const companyPhone1 = (phone1Raw || "").replace(/\s+/g, "");
+const companyPhone1  = (phone1Raw || "").replace(/\s+/g, "");
 const whatsappNumber = (whatsappRaw || "").replace(/\s+/g, "");
 
 const hqAddress = officeInfo?.companyAddress ?? fallbackAddress;
+
 const hqAddressParts = String(hqAddress)
   .split(",")
   .map((p: string) => p.trim())
@@ -86,12 +117,12 @@ const normalizeLink = (link?: string) => {
 
 /* API socials */
 const apiSocials: Social[] = [
-  officeInfo?.facebook && { id: "facebook-api", label: "Facebook", icon: "facebook", link: officeInfo.facebook },
+  officeInfo?.facebook  && { id: "facebook-api",  label: "Facebook",  icon: "facebook", link: officeInfo.facebook },
   officeInfo?.instagram && { id: "instagram-api", label: "Instagram", icon: "instagram", link: officeInfo.instagram },
-  officeInfo?.linkedin && { id: "linkedin-api", label: "LinkedIn", icon: "linkedin", link: officeInfo.linkedin },
-  officeInfo?.twitter && { id: "x-api", label: "X (Twitter)", icon: "x", link: officeInfo.twitter },
-  officeInfo?.youtube && { id: "youtube-api", label: "YouTube", icon: "youtube", link: officeInfo.youtube },
-  officeInfo?.gmail && { id: "gmail-api", label: "Email", icon: "mail", link: officeInfo.gmail },
+  officeInfo?.linkedin  && { id: "linkedin-api",  label: "LinkedIn",  icon: "linkedin", link: officeInfo.linkedin },
+  officeInfo?.twitter   && { id: "x-api",         label: "X (Twitter)", icon: "x", link: officeInfo.twitter },
+  officeInfo?.youtube   && { id: "youtube-api",   label: "YouTube",    icon: "youtube", link: officeInfo.youtube },
+  officeInfo?.gmail     && { id: "gmail-api",     label: "Email",      icon: "mail", link: officeInfo.gmail },
 ].filter(Boolean) as Social[];
 
 const hasApiYouTube = Boolean(officeInfo?.youtube);
@@ -273,7 +304,6 @@ const year = new Date().getFullYear();
               <div class="age-talk">
                 <div class="age-talkRow">
                   <span class="age-talkIcon">
-                    <!-- Phone -->
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                       <path d="M22 16.92v2a2 2 0 0 1-2.18 2 19.84 19.84 0 0 1-8.63-3.07A19.5 19.5 0 0 1 3.15 12.8 19.84 19.84 0 0 1 .08 4.18 2 2 0 0 1 2.06 2h2a2 2 0 0 1 2 1.72c.12.86.34 1.7.66 2.5a2 2 0 0 1-.45 2.11L5.4 9.91a16 16 0 0 0 8.69 8.69l1.58-1.87a2 2 0 0 1 2.11-.45c.8.32 1.64.54 2.5.66A2 2 0 0 1 22 16.92z"/>
                     </svg>
@@ -285,7 +315,6 @@ const year = new Date().getFullYear();
 
                 <div class="age-talkRow">
                   <span class="age-talkIcon">
-                    <!-- Email -->
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                       <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/>
                       <path d="m22 6-10 7L2 6"/>
@@ -301,7 +330,6 @@ const year = new Date().getFullYear();
               <div class="age-talkAddress">
                 <div class="age-addrRow">
                   <span class="age-addrPin">
-                    <!-- Location -->
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                       <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0Z"/>
                       <circle cx="12" cy="10" r="3"/>
@@ -314,10 +342,9 @@ const year = new Date().getFullYear();
                     rel="noopener noreferrer"
                     class="age-addrLines age-addrLink"
                   >
-                  {hqAddressParts.map((line) => (
-  <div>{line}</div>
-))}
-
+                    {hqAddressParts.map((line, idx) => (
+                      <div data-i={idx}>{line}</div>
+                    ))}
                   </a>
                 </div>
               </div>
@@ -335,8 +362,6 @@ const year = new Date().getFullYear();
                     isEmailLike(s) ? "mail" :
                     "generic";
 
-                  const key = s.id ?? norm(s);
-
                   return (
                     <a
                       href={s.link!}
@@ -345,7 +370,6 @@ const year = new Date().getFullYear();
                       aria-label={s.label || "Social link"}
                       title={s.label || undefined}
                       class="age-socialBtn"
-                      data-key={key}
                     >
                       {brand === "youtube" ? (
                         <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
@@ -389,6 +413,7 @@ const year = new Date().getFullYear();
               </div>
             </div>
           </div>
+
         </div>
       </div>
     </div>
@@ -529,12 +554,15 @@ const year = new Date().getFullYear();
 
     .age-addressBoard .age-addrLink{ margin:-4px -8px; padding:6px 8px; }
 
-    /* ✅ one row, no scrollbar */
+    /* ✅ desktop: one row; mobile: wrap instead of scroll */
     .age-social{
-      display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; align-items:center;
-      max-width:100%; overflow:visible; -ms-overflow-style:none; scrollbar-width:none;
+      display:flex; gap:8px; margin-top:14px; align-items:center;
+      flex-wrap:nowrap;
+      overflow:hidden;
     }
-    .age-social::-webkit-scrollbar{ display:none; }
+    @media (max-width: 640px){
+      .age-social{ flex-wrap:wrap; overflow:visible; }
+    }
 
     .age-socialBtn{
       flex:0 0 auto; width:44px; height:44px; border-radius:12px;
@@ -572,7 +600,6 @@ const year = new Date().getFullYear();
     .age-trustCard img{ max-height:36px; filter:grayscale(.05) saturate(.95) contrast(1.05); }
     .age-trustCard:hover img{ filter:grayscale(0) saturate(1.2) contrast(1.1); }
 
-    /* Beautiful Toast Notification Styles */
     .newsletter-toast {
       position: fixed;
       bottom: 20px;
@@ -631,10 +658,8 @@ const year = new Date().getFullYear();
         const env = (w.env && typeof w.env === "object") ? w.env : {};
 
         const rawBase = String(env.PUBLIC_API_BASE_URL || "").replace(/\/+$/, "");
-        // safer fallback (most of your endpoints are under /api)
         let base = rawBase || "https://test.amrita-fashions.com/api";
 
-        // if someone set only domain (no /api), append /api
         try {
           const u = new URL(base);
           if (u.pathname === "/" || u.pathname === "") base = base.replace(/\/+$/, "") + "/api";
@@ -658,7 +683,7 @@ const year = new Date().getFullYear();
         if (type === "error") newsletterToast.classList.add("error");
 
         newsletterToast.style.display = "flex";
-        newsletterToast.offsetHeight; // reflow
+        newsletterToast.offsetHeight;
         newsletterToast.classList.add("show");
 
         setTimeout(() => {
