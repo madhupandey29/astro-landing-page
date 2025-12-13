@@ -1,47 +1,34 @@
-// Utility file for API calls
-export const API_BASE = import.meta.env.PUBLIC_API_BASE_URL;
+// src/lib/api.ts
+export const API_BASE = String(import.meta.env.PUBLIC_API_BASE_URL || "").replace(/\/+$/, "");
 
-// Get API credentials from environment variables
-const API_KEY = import.meta.env.PUBLIC_API_KEY ?? '';
-const API_KEY_HEADER = import.meta.env.PUBLIC_API_KEY_HEADER ?? 'x-api-key';
-const ADMIN_EMAIL = import.meta.env.PUBLIC_ADMIN_EMAIL ?? '';
-const ADMIN_EMAIL_HEADER = import.meta.env.PUBLIC_ADMIN_EMAIL_HEADER ?? 'x-admin-email';
+export function buildHeaders(extra: Record<string, string> = {}) {
+  const headers: Record<string, string> = { Accept: "application/json", ...extra };
 
-/**
- * Creates headers object with authentication credentials
- * @returns Headers object with authentication included
- */
-export function createAuthHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {
-    'Accept': 'application/json'
-  };
+  const apiKey = import.meta.env.PUBLIC_API_KEY;
+  const apiKeyHeader = import.meta.env.PUBLIC_API_KEY_HEADER || "x-api-key";
 
-  // Add API key if provided
-  if (API_KEY) {
-    headers[API_KEY_HEADER] = API_KEY;
-  }
+  const adminEmail = import.meta.env.PUBLIC_ADMIN_EMAIL;
+  const adminEmailHeader = import.meta.env.PUBLIC_ADMIN_EMAIL_HEADER || "x-admin-email";
 
-  // Add admin email if provided
-  if (ADMIN_EMAIL) {
-    headers[ADMIN_EMAIL_HEADER] = ADMIN_EMAIL;
-  }
+  if (apiKey) headers[apiKeyHeader] = String(apiKey);
+  if (adminEmail) headers[adminEmailHeader] = String(adminEmail);
 
   return headers;
 }
 
-/**
- * Builds a full API URL from an endpoint
- * @param endpoint - API endpoint (relative to base URL)
- * @returns Full API URL
- */
-export const getApiUrl = (endpoint: string): string => {
-  // Remove leading slash if present to avoid double slashes
-  const cleanEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
-  return `${API_BASE}/${cleanEndpoint}`;
-};
+export function apiUrl(path: string) {
+  const p = String(path || "").replace(/^\/+/, "");
+  if (!API_BASE) return `/${p}`; // fallback (won't work for protected APIs)
+  return `${API_BASE}/${p}`;
+}
 
-export default {
-  API_BASE,
-  createAuthHeaders,
-  getApiUrl
-};
+export async function apiGet(path: string, init: RequestInit = {}) {
+  return fetch(apiUrl(path), {
+    method: "GET",
+    ...init,
+    headers: {
+      ...buildHeaders(),
+      ...(init.headers as Record<string, string> | undefined),
+    },
+  });
+}

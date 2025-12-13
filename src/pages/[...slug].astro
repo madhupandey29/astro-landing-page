@@ -13,29 +13,24 @@ import ContactSection from "../components/sections/ContactSection.astro";
 import RelatedProductsByLocation from "../components/sections/RelatedProductsByLocation.astro";
 import OverviewSection from "../components/sections/OverviewSection.astro";
 import StickyContactModal from "../components/StickyContactModal.astro";
-import CommitmentText from "../components/sections/CommitmentText.astro";
 import CityProductHero from "../components/sections/CityProductHero.astro";
 import ProductHeroBySlug from "../components/sections/ProductHeroBySlug.astro";
 import MarketAreaModal from "../components/MarketAreaModal.astro";
 import HeadSEO from "../components/HeadSEO.astro";
+
 import { apiGet } from "../lib/api-client";
 
 export const prerender = false;
 
 /* ========= Config ========= */
 const DEFAULT_CITY_CODE = "ahmedabad";
-const OVERVIEW_IMG = "/images/hero/overview-fabric.webp";
-
 /** Fixed default product slug used only for internal non-SEO logic */
 const FALLBACK_PRODUCT_SLUG = "silky-denim-55-ozs";
-// Use environment variable for API base
-const API_BASE = import.meta.env.PUBLIC_API_BASE_URL;
-const LANDING_API_BASE = import.meta.env.PUBLIC_API_BASE_URL;
 
-// SEO + office APIs
-const SEO_PUBLIC_API = `${API_BASE}/seo/public`;
-const SEO_DETAIL_API = `${API_BASE}/seo`;
-const OFFICE_INFO_API = `${LANDING_API_BASE}/officeinformation`;
+/* ========= Backend env (base + auth) ========= */
+const API_BASE_RAW = import.meta.env.PUBLIC_API_BASE_URL || "";
+const API_BASE = String(API_BASE_RAW).replace(/\/+$/, "");
+
 const API_KEY = import.meta.env.PUBLIC_API_KEY;
 const API_KEY_HEADER = import.meta.env.PUBLIC_API_KEY_HEADER || "x-api-key";
 const ADMIN_EMAIL = import.meta.env.PUBLIC_ADMIN_EMAIL;
@@ -43,23 +38,16 @@ const ADMIN_EMAIL_HEADER =
   import.meta.env.PUBLIC_ADMIN_EMAIL_HEADER || "x-admin-email";
 
 const authHeaders = (): Record<string, string> => {
-  const headers: Record<string, string> = { accept: "application/json" };
+  const headers: Record<string, string> = { Accept: "application/json" };
   if (API_KEY) headers[API_KEY_HEADER] = API_KEY;
   if (ADMIN_EMAIL) headers[ADMIN_EMAIL_HEADER] = ADMIN_EMAIL;
   return headers;
 };
 
-/** Product API */
-const PRODUCT_API = `${API_BASE}/product`;
+/* ========= Public GEO API base (can override via env) ========= */
+const GEO_API_BASE = import.meta.env.PUBLIC_GEO_API_BASE || "https://ipapi.co";
 
-/** Product × Location API (Astro landing) */
-const PRODUCT_LOCATION_API = `${API_BASE}/productandlocation/astro/products`;
-
-/** Public GEO API base (can override via env) */
-const GEO_API_BASE =
-  import.meta.env.PUBLIC_GEO_API_BASE || "https://ipapi.co";
-
-// Known city codes (can later come from API)
+/* Known city codes (can later come from API) */
 const CITY_CODES = [
   "ahmedabad",
   "jaipur",
@@ -92,7 +80,6 @@ const CITY_CODES = [
 ].map((s) => s.toLowerCase());
 
 /* ========= GEO helpers ========= */
-
 type GeoSlugs = {
   countrySlug: string;
   stateSlug: string;
@@ -119,9 +106,7 @@ const slugifyForPath = (value: string): string => {
 };
 
 /** Resolve GEO from request IP and map to {country,state,city,area} slugs */
-const getGeoSlugsFromRequest = async (
-  req: Request,
-): Promise<GeoSlugs | null> => {
+const getGeoSlugsFromRequest = async (req: Request): Promise<GeoSlugs | null> => {
   try {
     const xff = req.headers.get("x-forwarded-for") || "";
     const ipCandidate = xff.split(",")[0].trim();
@@ -134,7 +119,8 @@ const getGeoSlugsFromRequest = async (
       ? `${GEO_API_BASE}/${encodeURIComponent(ip)}/json/`
       : `${GEO_API_BASE}/json/`;
 
-    const res = await fetch(url, { headers: authHeaders() });
+    // ✅ GEO API is PUBLIC → do NOT send your backend auth headers here
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
     if (!res.ok) return null;
 
     const data = await res.json();
@@ -155,8 +141,7 @@ const getGeoSlugsFromRequest = async (
       data?.city ||
       FALLBACK_GEO.areaSlug;
 
-    const countrySlug =
-      slugifyForPath(countryName) || FALLBACK_GEO.countrySlug;
+    const countrySlug = slugifyForPath(countryName) || FALLBACK_GEO.countrySlug;
     const stateSlug = slugifyForPath(stateName) || FALLBACK_GEO.stateSlug;
     const citySlug = slugifyForPath(cityName) || FALLBACK_GEO.citySlug;
     const areaSlug = slugifyForPath(areaName) || FALLBACK_GEO.areaSlug;
@@ -168,15 +153,16 @@ const getGeoSlugsFromRequest = async (
 };
 
 /* ========= Params / URL schema parsing ========= */
-
 const raw = Astro.params.slug as string | undefined;
 
-// 1. Check if the URL path ends with '/market-area'
-const isMarketAreaModalPath = raw?.endsWith("/market-area") ?? false;
+// ✅ IMPORTANT FIX:
+// /market-area => raw is usually "market-area" (no slash), so endsWith("/market-area") was FALSE before.
+const isMarketAreaModalPath =
+  raw === "market-area" || (raw ? raw.endsWith("/market-area") : false);
 
-// 2. Remove the market-area segment for SEO/Content routing
+// Remove trailing market-area segment for SEO/Content routing
 const rawForRouting = isMarketAreaModalPath
-  ? raw!.replace(/\/market-area$/, "")
+  ? (raw || "").replace(/(?:^|\/)market-area$/, "")
   : raw;
 
 const segments = rawForRouting
@@ -203,16 +189,12 @@ const isCityLanding =
   !isHomePage && !isProductLocationPage && CITY_CODES.includes(first);
 const isCityPage = isCityLanding;
 
-/* ========= Request URL (only for "Home" breadcrumb origin) ========= */
-
+/* ========= Request URL ========= */
 const reqUrl = new URL(Astro.request.url);
 
 /* ========= GEO-based slugs ========= */
-
 let geo: GeoSlugs | null = await getGeoSlugsFromRequest(Astro.request);
-if (!geo) {
-  geo = FALLBACK_GEO;
-}
+if (!geo) geo = FALLBACK_GEO;
 
 // product slug coming from URL only in /:productSlug/in/...
 let productSlugFromUrl = "";
@@ -238,46 +220,69 @@ if (isProductLocationPage && geo) {
 }
 
 // For internal non-SEO use only
-const slugForGeo =
-  (productSlugFromUrl || FALLBACK_PRODUCT_SLUG).toLowerCase();
+const slugForGeo = (productSlugFromUrl || FALLBACK_PRODUCT_SLUG).toLowerCase();
 
-/* ========= City / current-city helpers ========= */
-
+/* ========= Current city helper ========= */
 const currentCity = isCityLanding
   ? first
-  : (citySlug || locationSlug || DEFAULT_CITY_CODE);
+  : citySlug || locationSlug || DEFAULT_CITY_CODE;
 
 /* ========= SEO / product-location fetch ========= */
-
 const norm = (s: any) => String(s ?? "").trim().toLowerCase();
 type SeoDoc = Record<string, any>;
 
 let seoDoc: SeoDoc | null = null;
 let relatedSeoDocs: SeoDoc[] = [];
 
-// Skip SEO calls for pure modal-only path
+// Skip SEO calls for pure modal-only path (/market-area*)
 if (!isMarketAreaModalPath) {
   try {
     if (isProductLocationPage && slugForGeo) {
-      // 1) Try product×location Astro API (contains product + meta)
+      // ✅ Try a dedicated endpoint (if you have it)
+      let got = false;
+
       try {
-        // Use our new authenticated API client
-        const response = await apiGet(`product-location/${slugForGeo}`);
-        
+        const response = await apiGet(`product-location/${encodeURIComponent(slugForGeo)}`);
         if (response.ok) {
           const json = await response.json();
-          const data = Array.isArray(json) ? json : json?.data || [];
+          const data = Array.isArray(json) ? json : Array.isArray(json?.data) ? json.data : [];
           if (data.length) {
             seoDoc = data[0];
             relatedSeoDocs = data.slice(1);
+            got = true;
           }
         }
       } catch {
         // ignore and fallback
       }
+
+      // ✅ Fallback to your existing endpoint if dedicated one isn't present
+      if (!got) {
+        try {
+          const response = await apiGet(`productandlocation/astro/products`);
+          if (response.ok) {
+            const json = await response.json();
+            const rows = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
+
+            const matched =
+              rows.find((row: any) => {
+                const rowSlug = norm(row?.slug);
+                const productSlug = norm(row?.product?.slug);
+                return rowSlug === norm(slugForGeo) || productSlug === norm(slugForGeo);
+              }) || rows[0];
+
+            if (matched) {
+              seoDoc = matched;
+              relatedSeoDocs = rows.filter((r: any) => r !== matched);
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
     } else {
-      // City / generic pages: SEO_PUBLIC_API with path + GEO info
-      const url = new URL(`${import.meta.env.PUBLIC_API_BASE_URL}/seo`);
+      // City / generic pages: use backend SEO endpoint with path + GEO info
+      const url = new URL(`${API_BASE}/seo`);
       url.searchParams.set("path", reqUrl.pathname.replace(/\/+$/, "") || "/");
       url.searchParams.set("mode", isCityPage ? "city" : "generic");
 
@@ -288,9 +293,7 @@ if (!isMarketAreaModalPath) {
         url.searchParams.set("location", geo.areaSlug);
       }
 
-      // Use our new authenticated API client for SEO data
       const response = await apiGet(`seo${url.search}`);
-      
       if (response.ok) {
         const json = await response.json();
         const data: SeoDoc[] = Array.isArray(json?.data)
@@ -307,11 +310,11 @@ if (!isMarketAreaModalPath) {
     }
   } catch {
     seoDoc = null;
+    relatedSeoDocs = [];
   }
 }
 
 /* ========= Product fetch (for title, schema, etc.) ========= */
-
 type ProductDoc = {
   _id?: string;
   slug?: string;
@@ -331,11 +334,7 @@ type ProductDoc = {
 let productDoc: ProductDoc | null = null;
 
 const extractFirstProduct = (json: any): ProductDoc | null => {
-  const data = Array.isArray(json?.data)
-    ? json.data
-    : json?.data
-    ? [json.data]
-    : [];
+  const data = Array.isArray(json?.data) ? json.data : json?.data ? [json.data] : [];
   return data.length ? (data[0] as ProductDoc) : null;
 };
 
@@ -351,32 +350,26 @@ const currentSlug =
 if (!isMarketAreaModalPath) {
   try {
     // For product × location: if product is already embedded in seoDoc, use it
-    if (
-      isProductLocationPage &&
-      seoDoc?.product &&
-      typeof seoDoc.product === "object"
-    ) {
+    if (isProductLocationPage && seoDoc?.product && typeof seoDoc.product === "object") {
       productDoc = seoDoc.product as ProductDoc;
     } else {
       // 1) Try by product ID from SEO document (seoDoc.product = "6931...")
       if (seoDoc?.product && typeof seoDoc.product === "string") {
         try {
-          // Use our new authenticated API client
           const byIdResponse = await apiGet(`product/${encodeURIComponent(seoDoc.product)}`);
           if (byIdResponse.ok) {
             const json = await byIdResponse.json();
             productDoc = extractFirstProduct(json);
           }
         } catch {
-          // ignore and fallback
+          // ignore
         }
       }
 
-      // 2) Fallback – try by slug (e.g. silky-denim-55-ozs)
+      // 2) Fallback – try by slug
       if (!productDoc && currentSlug) {
         try {
-          // Use our new authenticated API client
-          const bySlugResponse = await apiGet(`product?slug=${currentSlug}`);
+          const bySlugResponse = await apiGet(`product?slug=${encodeURIComponent(currentSlug)}`);
           if (bySlugResponse.ok) {
             const json = await bySlugResponse.json();
             productDoc = extractFirstProduct(json);
@@ -392,12 +385,6 @@ if (!isMarketAreaModalPath) {
 }
 
 /* ========= Page-level title/description (layout props) ========= */
-/**
- * These props are used by the layout and for on-page visible headings.
- * They only use values coming from APIs (seoDoc and productDoc).
- * No static text is used for meta purposes.
- */
-
 const derivedTitleFromData =
   productDoc?.productTitle ||
   productDoc?.name ||
@@ -406,7 +393,6 @@ const derivedTitleFromData =
   seoDoc?.title ||
   "";
 
-// For SEO meta: if we don't have any API-driven title/desc, we simply don't render them.
 const pageTitle =
   derivedTitleFromData && derivedTitleFromData.trim().length
     ? derivedTitleFromData
@@ -419,8 +405,7 @@ const pageDesc =
     "") || undefined;
 
 /**
- * Canonical: use ONLY the value that comes from API (seoDoc.canonical_url).
- * No fallback to request URL.
+ * Canonical: use ONLY API value (seoDoc.canonical_url)
  */
 const canonical =
   typeof seoDoc?.canonical_url === "string" &&
@@ -441,21 +426,17 @@ function s(v: any) {
 }
 
 const stripHtml = (value: string) =>
-  value
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 
 const cleanText = (value: any) => {
-  const raw = s(value);
-  if (!raw) return undefined;
-  const cleaned = stripHtml(raw);
+  const raw2 = s(value);
+  if (!raw2) return undefined;
+  const cleaned = stripHtml(raw2);
   return cleaned || undefined;
 };
 
 const cleanPhone = (value: string) => value.replace(/[^\d+]/g, "");
 
-// safely convert anything to a finite number (or undefined)
 const asNumber = (v: any) => {
   if (v === null || v === undefined) return undefined;
   const n = Number(v);
@@ -474,15 +455,19 @@ type OfficeInfo = {
 };
 
 let officeDoc: OfficeInfo | null = null;
-try {
-  const res = await fetch(OFFICE_INFO_API, { headers: authHeaders() });
-  if (res.ok) {
-    const json = await res.json();
-    const data = Array.isArray(json?.data) ? json.data : [];
-    officeDoc = data.length ? (data[0] as OfficeInfo) : null;
+
+if (!isMarketAreaModalPath) {
+  try {
+    // ✅ use auth headers
+    const res = await fetch(`${API_BASE}/officeinformation`, { headers: authHeaders() });
+    if (res.ok) {
+      const json = await res.json();
+      const data = Array.isArray(json?.data) ? json.data : [];
+      officeDoc = data.length ? (data[0] as OfficeInfo) : null;
+    }
+  } catch {
+    officeDoc = null;
   }
-} catch (_e) {
-  officeDoc = null;
 }
 
 const company = {
@@ -497,10 +482,8 @@ const company = {
 };
 
 /* ========= Extra app-level meta values from API ========= */
-/** These are now API-driven, not computed from IP+fallback. */
 const xGeoProductUrl =
-  (seoDoc?.xGeoProductUrl && String(seoDoc.xGeoProductUrl).trim()) ||
-  undefined;
+  (seoDoc?.xGeoProductUrl && String(seoDoc.xGeoProductUrl).trim()) || undefined;
 
 const xProductSlug =
   (seoDoc?.xProductSlug && String(seoDoc.xProductSlug).trim().toLowerCase()) ||
@@ -508,11 +491,9 @@ const xProductSlug =
   undefined;
 
 /* ========= JSON-LD ========= */
-
 const structuredData = (() => {
   if (isMarketAreaModalPath) return [];
 
-  // If you want JSON-LD only when you have either seoDoc or company info:
   if (!seoDoc && !company.name) return [];
 
   const canonicalUrl = seoDoc?.canonical_url || canonical;
@@ -531,15 +512,9 @@ const structuredData = (() => {
 
   const productNode: any = productDoc ?? seoDoc?.product ?? null;
 
-  const priceNum = asNumber(
-    productNode?.salesPrice ?? seoDoc?.salesPrice,
-  );
-  const ratingValueNum = asNumber(
-    productNode?.rating_value ?? seoDoc?.rating_value,
-  );
-  const ratingCountNum = asNumber(
-    productNode?.rating_count ?? seoDoc?.rating_count,
-  );
+  const priceNum = asNumber(productNode?.salesPrice ?? seoDoc?.salesPrice);
+  const ratingValueNum = asNumber(productNode?.rating_value ?? seoDoc?.rating_value);
+  const ratingCountNum = asNumber(productNode?.rating_count ?? seoDoc?.rating_count);
 
   const imageUrl =
     seoDoc?.ogImage ||
@@ -578,8 +553,7 @@ const structuredData = (() => {
         }
       : null;
 
-  const hasProductData =
-    productName || productDescription || imageUrl || priceNum;
+  const hasProductData = productName || productDescription || imageUrl || priceNum;
 
   const productLd =
     seoDoc && hasProductData
@@ -590,12 +564,7 @@ const structuredData = (() => {
           description: productDescription,
           sku: cleanText(seoDoc?.sku),
           mpn: cleanText(seoDoc?.productIdentifier),
-          brand: company.name
-            ? {
-                "@type": "Brand",
-                name: company.name,
-              }
-            : undefined,
+          brand: company.name ? { "@type": "Brand", name: company.name } : undefined,
           image: imageUrl ? [String(imageUrl)] : undefined,
           offers:
             priceNum !== undefined
@@ -624,12 +593,7 @@ const structuredData = (() => {
           "@context": "https://schema.org",
           "@type": "BreadcrumbList",
           itemListElement: [
-            {
-              "@type": "ListItem",
-              position: 1,
-              name: "Home",
-              item: reqUrl.origin,
-            },
+            { "@type": "ListItem", position: 1, name: "Home", item: reqUrl.origin },
             !isCityPage
               ? {
                   "@type": "ListItem",
@@ -658,9 +622,7 @@ const structuredData = (() => {
         }
       : null;
 
-  return [organizationLd, productLd, breadcrumbLd, localBusinessLd].filter(
-    Boolean,
-  );
+  return [organizationLd, productLd, breadcrumbLd, localBusinessLd].filter(Boolean);
 })();
 
 const structuredDataJson = structuredData
@@ -673,23 +635,23 @@ const structuredDataJson = structuredData
 
 <LandingLayout title={pageTitle} description={pageDesc} canonical={canonical}>
   <Fragment slot="head">
-    {/* All meta/OG/Twitter comes from APIs via seoDoc + defaultseo */}
-    <HeadSEO seo={seoDoc} canonical={canonical} />
+    {/* ✅ IMPORTANT: On /market-area* skip HeadSEO so it won't hit defaultseo/officeinformation (and won't log 401s). */}
+    {!isMarketAreaModalPath && <HeadSEO seo={seoDoc} canonical={canonical} />}
 
-    {/* Extra internal meta for your app – now API-driven */}
-    {xGeoProductUrl && (
+    {!isMarketAreaModalPath && xGeoProductUrl && (
       <meta name="x-geo-product-url" content={xGeoProductUrl} />
     )}
-    {xProductSlug && (
+    {!isMarketAreaModalPath && xProductSlug && (
       <meta name="x-product-slug" content={xProductSlug} />
     )}
 
-    {/* JSON-LD schema */}
-    {structuredDataJson.map((json) => (
-      <script type="application/ld+json" set:html={json} />
-    ))}
+    {!isMarketAreaModalPath &&
+      structuredDataJson.map((json) => (
+        <script type="application/ld+json" set:html={json} />
+      ))}
   </Fragment>
 
+  {/* Keep your existing behavior: market-area route shows just modal-related UI */}
   {isMarketAreaModalPath ? null : (
     <Fragment>
       {isCityPage ? (
@@ -703,9 +665,7 @@ const structuredDataJson = structuredData
       )}
 
       {isCityPage ? (
-        <OverviewSection
-          currentSlug={currentSlug}
-        />
+        <OverviewSection currentSlug={currentSlug} />
       ) : (
         <OverviewSection currentSlug={currentSlug} />
       )}
@@ -738,12 +698,14 @@ const structuredDataJson = structuredData
   />
 
   <WhatsAppFab />
+
   <FashionTestimonial
-  locationName={
-    seoDoc?.location?.name ||
-    (currentCity && currentCity.charAt(0).toUpperCase() + currentCity.slice(1))
-  }
-/>
+    locationName={
+      seoDoc?.location?.name ||
+      (currentCity && currentCity.charAt(0).toUpperCase() + currentCity.slice(1))
+    }
+  />
+
   <FAQ />
   <ContactSection />
   <MarketAreaModal />

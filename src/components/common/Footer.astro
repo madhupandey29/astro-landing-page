@@ -1,103 +1,104 @@
 ---
+/* src/components/common/Footer.astro */
+
 /* Fallback social list */
-import social_data from '../../data/social-data.ts';
+import social_data from "../../data/social-data.ts";
+
+/* ✅ Use secure API client (adds x-api-key + x-admin-email headers) */
+import { apiGet } from "../../lib/api-client.ts";
 
 type Social = { id?: string | number; label?: string; icon?: string; link?: string };
 
 /* Trusted badges (Astro serves /public at the web root) */
 const trustedLogos = [
-  { src: '/images/brand/BCI.avif',                   alt: 'BCI Better Cotton Initiative' },
-  { src: '/images/brand/confidence_Textiles.avif',   alt: 'OEKO-TEX Standard' },
-  { src: '/images/brand/ecovero.avif',               alt: 'Lenzing EcoVero' },
-  { src: '/images/brand/global.avif',                alt: 'Global Recycled Standard' },
-  { src: '/images/brand/organic.avif',               alt: 'Organic 100 Content Standard' },
-  { src: '/images/brand/gold.avif',                  alt: 'Organic 100 Content Standard' },
+  { src: "/images/brand/BCI.avif",                 alt: "BCI Better Cotton Initiative" },
+  { src: "/images/brand/confidence_Textiles.avif", alt: "OEKO-TEX Standard" },
+  { src: "/images/brand/ecovero.avif",             alt: "Lenzing EcoVero" },
+  { src: "/images/brand/global.avif",              alt: "Global Recycled Standard" },
+  { src: "/images/brand/organic.avif",             alt: "Organic 100 Content Standard" },
+  { src: "/images/brand/gold.avif",                alt: "Organic Certification" },
 ];
 
-/* ========= Fetch officeinformation ========= */
-const API_BASE =
-  import.meta.env.PUBLIC_API_BASE_URL ?? 'https://test.amrita-fashions.com';
-
+/* ========= Fetch officeinformation (FIXED: passes headers) ========= */
 let officeInfo: any = null;
 
 try {
-  const res = await fetch(`${API_BASE}/officeinformation`);
+  const res = await apiGet("officeinformation", { cache: "no-store" });
   if (res.ok) {
     const json = await res.json();
-    officeInfo = json?.data?.[0] ?? null;
+    officeInfo =
+      (Array.isArray(json?.data) && json.data.length ? json.data[0] : null) ??
+      (Array.isArray(json) && json.length ? json[0] : null) ??
+      null;
   } else {
-    console.error('officeinformation fetch failed', res.status);
+    console.error("officeinformation fetch failed", res.status);
   }
 } catch (err) {
-  console.error('Error fetching officeinformation:', err);
+  console.error("Error fetching officeinformation:", err);
 }
 
 /* ========= Company / contact fields ========= */
 const fallbackAddress =
-  '404, Safal Prelude, Corporate Rd, Prahlad Nagar, Ahmedabad, Gujarat 380015';
+  "404, Safal Prelude, Corporate Rd, Prahlad Nagar, Ahmedabad, Gujarat 380015";
 
-const companyName   = officeInfo?.companyName  ?? 'Amrita Global Enterprises';
-const companyEmail  = officeInfo?.companyEmail ?? 'info@amrita-fashions.com';
+const companyName = officeInfo?.companyName ?? "Amrita Global Enterprises";
+const companyEmail = officeInfo?.companyEmail ?? "info@amrita-fashions.com";
 
-const phone1Raw     = officeInfo?.companyPhone1  ?? '+919925155141';
-const whatsappRaw   = officeInfo?.whatsappNumber ?? phone1Raw;
+const phone1Raw = officeInfo?.companyPhone1 ?? "+919925155141";
+const whatsappRaw = officeInfo?.whatsappNumber ?? phone1Raw;
 
-const companyPhone1  = (phone1Raw   || '').replace(/\s+/g, '');
-const whatsappNumber = (whatsappRaw || '').replace(/\s+/g, '');
+const companyPhone1 = (phone1Raw || "").replace(/\s+/g, "");
+const whatsappNumber = (whatsappRaw || "").replace(/\s+/g, "");
 
-const hqAddress      = officeInfo?.companyAddress ?? fallbackAddress;
-const hqAddressParts = hqAddress.split(',').map((p: string) => p.trim());
-const hqAddressMapHref = `https://maps.google.com/?q=${encodeURIComponent(hqAddress)}`;
+const hqAddress = officeInfo?.companyAddress ?? fallbackAddress;
+const hqAddressParts = String(hqAddress)
+  .split(",")
+  .map((p: string) => p.trim())
+  .filter(Boolean);
+
+const hqAddressMapHref = `https://maps.google.com/?q=${encodeURIComponent(
+  String(hqAddress || fallbackAddress)
+)}`;
 
 /* ========= Socials (API + fallback) ========= */
-
 const norm = (it: Social) =>
-  `${(it?.label||'').toLowerCase().trim()}|${(it?.icon||'').toLowerCase().trim()}|${(it?.link||'').toLowerCase().replace(/\/+$/,'').trim()}`;
+  `${(it?.label || "").toLowerCase().trim()}|${(it?.icon || "")
+    .toLowerCase()
+    .trim()}|${(it?.link || "").toLowerCase().replace(/\/+$/, "").trim()}`;
 
 const isYouTube = (it: Social) => {
-  const s = `${it?.label ?? ''} ${it?.icon ?? ''} ${it?.link ?? ''}`.toLowerCase();
-  return s.includes('youtube') || s.includes('youtu.be') || s.includes('youtube.com');
+  const s = `${it?.label ?? ""} ${it?.icon ?? ""} ${it?.link ?? ""}`.toLowerCase();
+  return s.includes("youtube") || s.includes("youtu.be") || s.includes("youtube.com");
+};
+
+const isEmailLike = (it: Social) => {
+  const s = `${it?.label ?? ""} ${it?.icon ?? ""} ${it?.link ?? ""}`.toLowerCase();
+  return s.includes("gmail") || s.includes("email") || s.includes("mail");
+};
+
+const normalizeLink = (link?: string) => {
+  const v = String(link || "").trim();
+  if (!v) return "";
+  // convert plain emails to mailto
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return `mailto:${v}`;
+  return v;
 };
 
 /* API socials */
 const apiSocials: Social[] = [
-  officeInfo?.facebook && {
-    id: 'facebook-api',
-    label: 'Facebook',
-    icon: 'facebook',
-    link: officeInfo.facebook,
-  },
-  officeInfo?.instagram && {
-    id: 'instagram-api',
-    label: 'Instagram',
-    icon: 'instagram',
-    link: officeInfo.instagram,
-  },
-  officeInfo?.linkedin && {
-    id: 'linkedin-api',
-    label: 'LinkedIn',
-    icon: 'linkedin',
-    link: officeInfo.linkedin,
-  },
-  officeInfo?.twitter && {
-    id: 'x-api',
-    label: 'X (Twitter)',
-    icon: 'x',
-    link: officeInfo.twitter,
-  },
-  officeInfo?.youtube && {
-    id: 'youtube-api',
-    label: 'YouTube',
-    icon: 'youtube',
-    link: officeInfo.youtube,
-  },
+  officeInfo?.facebook && { id: "facebook-api", label: "Facebook", icon: "facebook", link: officeInfo.facebook },
+  officeInfo?.instagram && { id: "instagram-api", label: "Instagram", icon: "instagram", link: officeInfo.instagram },
+  officeInfo?.linkedin && { id: "linkedin-api", label: "LinkedIn", icon: "linkedin", link: officeInfo.linkedin },
+  officeInfo?.twitter && { id: "x-api", label: "X (Twitter)", icon: "x", link: officeInfo.twitter },
+  officeInfo?.youtube && { id: "youtube-api", label: "YouTube", icon: "youtube", link: officeInfo.youtube },
+  officeInfo?.gmail && { id: "gmail-api", label: "Email", icon: "mail", link: officeInfo.gmail },
 ].filter(Boolean) as Social[];
 
 const hasApiYouTube = Boolean(officeInfo?.youtube);
 
 /* Fallback socials from social-data.ts
    – if API has YouTube, drop *all* YouTube entries from fallback */
-const fallbackSocials: Social[] = (social_data as Social[] || []).filter((it) => {
+const fallbackSocials: Social[] = ((social_data as Social[]) || []).filter((it) => {
   if (!hasApiYouTube) return true;
   return !isYouTube(it);
 });
@@ -107,13 +108,15 @@ const socials: Social[] = (() => {
   const seen = new Set<string>();
   const merged = [...apiSocials, ...fallbackSocials];
 
-  const cleaned = merged.filter((it) => {
-    const key = (it?.link || '').toLowerCase().replace(/\/+$/,'').trim();
-    if (!key) return false;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return Boolean(it?.link) && Boolean(it?.icon || it?.label);
-  });
+  const cleaned = merged
+    .map((it) => ({ ...it, link: normalizeLink(it?.link) }))
+    .filter((it) => {
+      const key = (it?.link || "").toLowerCase().replace(/\/+$/, "").trim();
+      if (!key) return false;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return Boolean(it?.link) && Boolean(it?.icon || it?.label);
+    });
 
   return cleaned.slice(0, 5);
 })();
@@ -222,16 +225,42 @@ const year = new Date().getFullYear();
 
               <!-- Newsletter -->
               <div class="age-newsMini">
-                <p class="age-newsDesc">Subscribe to our newsletter to get the latest news and offers.</p>
+                <p class="age-newsDesc">
+                  Subscribe to our newsletter to get the latest news and offers.
+                </p>
+
                 <form class="age-pill" id="newsletterForm">
-                  <input type="email" id="newsletterEmail" required placeholder="Subscribe with us" aria-label="Email address" />
+                  <input
+                    type="email"
+                    id="newsletterEmail"
+                    required
+                    placeholder="Subscribe with us"
+                    aria-label="Email address"
+                  />
                   <button type="submit" aria-label="Subscribe" class="age-pillBtn">
                     <span class="age-arrow">›</span>
                   </button>
                 </form>
-                <div id="newsletterToast" class="newsletter-toast">
+
+                <div
+                  id="newsletterToast"
+                  class="newsletter-toast"
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
                   <div class="newsletter-toast-content">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
                       <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                       <polyline points="22 4 12 14.01 9 11.01"></polyline>
                     </svg>
@@ -249,13 +278,11 @@ const year = new Date().getFullYear();
                       <path d="M22 16.92v2a2 2 0 0 1-2.18 2 19.84 19.84 0 0 1-8.63-3.07A19.5 19.5 0 0 1 3.15 12.8 19.84 19.84 0 0 1 .08 4.18 2 2 0 0 1 2.06 2h2a2 2 0 0 1 2 1.72c.12.86.34 1.7.66 2.5a2 2 0 0 1-.45 2.11L5.4 9.91a16 16 0 0 0 8.69 8.69l1.58-1.87a2 2 0 0 1 2.11-.45c.8.32 1.64.54 2.5.66A2 2 0 0 1 22 16.92z"/>
                     </svg>
                   </span>
-                  <a
-                    class="age-talkLink"
-                    href={`tel:${whatsappNumber || companyPhone1}`}
-                  >
+                  <a class="age-talkLink" href={`tel:${whatsappNumber || companyPhone1}`}>
                     {whatsappNumber || companyPhone1}
                   </a>
                 </div>
+
                 <div class="age-talkRow">
                   <span class="age-talkIcon">
                     <!-- Email -->
@@ -280,15 +307,17 @@ const year = new Date().getFullYear();
                       <circle cx="12" cy="10" r="3"/>
                     </svg>
                   </span>
-                  <a 
+
+                  <a
                     href={hqAddressMapHref}
-                    target="_blank" 
+                    target="_blank"
                     rel="noopener noreferrer"
                     class="age-addrLines age-addrLink"
                   >
-                    {hqAddressParts.map((line, idx) => (
-                      <div>{line}</div>
-                    ))}
+                  {hqAddressParts.map((line) => (
+  <div>{line}</div>
+))}
+
                   </a>
                 </div>
               </div>
@@ -296,66 +325,70 @@ const year = new Date().getFullYear();
               <!-- Social (API + fallback) -->
               <div class="age-social" role="group" aria-label="Social links">
                 {socials.map((s) => {
-                  const t = `${s?.label ?? ''} ${s?.icon ?? ''} ${s?.link ?? ''}`.toLowerCase();
+                  const t = `${s?.label ?? ""} ${s?.icon ?? ""} ${s?.link ?? ""}`.toLowerCase();
                   const brand =
-                    t.includes('youtube') || t.includes('youtu') ? 'youtube' :
-                    t.includes('instagram') || t.includes('insta') ? 'instagram' :
-                    t.includes('facebook') || t.includes('fb.') ? 'facebook' :
-                    t.includes('linkedin') ? 'linkedin' :
-                    (t.includes('x.com') || t.includes('twitter')) ? 'x' : 'generic';
+                    t.includes("youtube") || t.includes("youtu") ? "youtube" :
+                    t.includes("instagram") || t.includes("insta") ? "instagram" :
+                    t.includes("facebook") || t.includes("fb.") ? "facebook" :
+                    t.includes("linkedin") ? "linkedin" :
+                    (t.includes("x.com") || t.includes("twitter")) ? "x" :
+                    isEmailLike(s) ? "mail" :
+                    "generic";
 
                   const key = s.id ?? norm(s);
 
                   return (
                     <a
                       href={s.link!}
-                      target="_blank"
+                      target={String(s.link || "").startsWith("mailto:") ? "_self" : "_blank"}
                       rel="noopener noreferrer"
-                      aria-label={s.label || 'Social link'}
+                      aria-label={s.label || "Social link"}
                       title={s.label || undefined}
                       class="age-socialBtn"
                       data-key={key}
                     >
-                      {
-                        brand === 'youtube' ? (
-                          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-                            <rect x="2.5" y="6.5" width="19" height="11" rx="3" ry="3" fill="none" stroke="currentColor" stroke-width="2"/>
-                            <path d="M10 9.7v4.6l4.8-2.3L10 9.7z" fill="currentColor"/>
-                          </svg>
-                        ) : brand === 'instagram' ? (
-                          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-                            <rect x="3" y="3" width="18" height="18" rx="5" ry="5" fill="none" stroke="currentColor" stroke-width="2"/>
-                            <circle cx="12" cy="12" r="4.1" fill="none" stroke="currentColor" stroke-width="2"/>
-                            <circle cx="17" cy="7" r="1.3" fill="currentColor"/>
-                          </svg>
-                        ) : brand === 'facebook' ? (
-                          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M13.4 20v-7H16l.5-3h-3v-1.3c0-1 .4-1.7 1.8-1.7H16.5V4.5c-.3 0-.9-.1-1.9-.1-2.8 0-4.2 1.2-4.2 4.1V10H8v3h2.4v7h3z" fill="currentColor"/>
-                          </svg>
-                        ) : brand === 'linkedin' ? (
-                          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-                            <rect x="4" y="10" width="3" height="10" rx=".6" fill="currentColor"/>
-                            <circle cx="5.5" cy="6.5" r="1.5" fill="currentColor"/>
-                            <path d="M10 10h3v1.4c.6-.9 1.5-1.6 3-1.6 2.3 0 3.5 1.4 3.5 3.9V20h-3v-4.6c0-1.3-.6-2-1.8-2s-1.9.8-1.9 2.1V20h-2.8V10z" fill="currentColor"/>
-                          </svg>
-                        ) : brand === 'x' ? (
-                          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M4 4l16 16M20 4L4 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                          </svg>
-                        ) : (
-                          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M12 8h6v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            <path d="M6 18L18 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                          </svg>
-                        )
-                      }
+                      {brand === "youtube" ? (
+                        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                          <rect x="2.5" y="6.5" width="19" height="11" rx="3" ry="3" fill="none" stroke="currentColor" stroke-width="2"/>
+                          <path d="M10 9.7v4.6l4.8-2.3L10 9.7z" fill="currentColor"/>
+                        </svg>
+                      ) : brand === "instagram" ? (
+                        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                          <rect x="3" y="3" width="18" height="18" rx="5" ry="5" fill="none" stroke="currentColor" stroke-width="2"/>
+                          <circle cx="12" cy="12" r="4.1" fill="none" stroke="currentColor" stroke-width="2"/>
+                          <circle cx="17" cy="7" r="1.3" fill="currentColor"/>
+                        </svg>
+                      ) : brand === "facebook" ? (
+                        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M13.4 20v-7H16l.5-3h-3v-1.3c0-1 .4-1.7 1.8-1.7H16.5V4.5c-.3 0-.9-.1-1.9-.1-2.8 0-4.2 1.2-4.2 4.1V10H8v3h2.4v7h3z" fill="currentColor"/>
+                        </svg>
+                      ) : brand === "linkedin" ? (
+                        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                          <rect x="4" y="10" width="3" height="10" rx=".6" fill="currentColor"/>
+                          <circle cx="5.5" cy="6.5" r="1.5" fill="currentColor"/>
+                          <path d="M10 10h3v1.4c.6-.9 1.5-1.6 3-1.6 2.3 0 3.5 1.4 3.5 3.9V20h-3v-4.6c0-1.3-.6-2-1.8-2s-1.9.8-1.9 2.1V20h-2.8V10z" fill="currentColor"/>
+                        </svg>
+                      ) : brand === "x" ? (
+                        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M4 4l16 16M20 4L4 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                      ) : brand === "mail" ? (
+                        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M4 6h16v12H4z" fill="none" stroke="currentColor" stroke-width="2"/>
+                          <path d="M4 7l8 6 8-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                      ) : (
+                        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M12 8h6v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                          <path d="M6 18L18 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                      )}
                     </a>
                   );
                 })}
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </div>
@@ -372,7 +405,16 @@ const year = new Date().getFullYear();
           <div class="age-trust">
             {trustedLogos.map((l) => (
               <div class="age-trustCard" title={l.alt}>
-                <img src={l.src} alt={l.alt} width="60" height="60" loading="lazy" decoding="async" fetchpriority="low" style="width:36px;height:auto;max-height:36px;" />
+                <img
+                  src={l.src}
+                  alt={l.alt}
+                  width="60"
+                  height="60"
+                  loading="lazy"
+                  decoding="async"
+                  fetchpriority="low"
+                  style="width:36px;height:auto;max-height:36px;"
+                />
               </div>
             ))}
           </div>
@@ -395,7 +437,6 @@ const year = new Date().getFullYear();
       color: var(--TEXT_MAIN);
     }
     .age-footer__gradient{ background:linear-gradient(180deg,var(--BG_TOP),var(--BG_BOTTOM)); border-top:1px solid var(--BORDER_SOFT); }
-
     .age-container{ max-width:1200px; margin:0 auto; padding:0 16px; }
 
     .age-grid{ display:grid; grid-template-columns: 1.2fr .8fr .9fr .9fr; gap:28px; }
@@ -403,7 +444,6 @@ const year = new Date().getFullYear();
     @media (max-width: 640px){ .age-grid{ grid-template-columns: 1fr; gap:20px; } }
 
     .age-col{ min-width:0; }
-
     .age-footer__top{ padding:48px 0 26px; }
     .age-footer__bottom{ background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,0)); border-top:1px solid var(--BORDER_SOFT); padding:14px 0 20px; }
 
@@ -467,10 +507,7 @@ const year = new Date().getFullYear();
     .age-talkAddress{ margin-top:6px; }
     .age-addrRow{ display:flex; gap:10px; align-items:flex-start; }
     .age-addrPin{ color:var(--BRAND_GOLD); display:inline-flex; align-items:center; justify-content:center; }
-    .age-addrLines{ 
-      line-height:1.65; 
-      color:var(--TEXT_SOFT); 
-    }
+    .age-addrLines{ line-height:1.65; color:var(--TEXT_SOFT); }
 
     .age-addrLink{
       text-decoration:none;
@@ -489,15 +526,10 @@ const year = new Date().getFullYear();
       transform:translateY(-1px);
       box-shadow:0 4px 12px rgba(0,0,0,0.15);
     }
-    .age-addrLink div{
-      transition:color 0.3s ease;
-    }
 
-    .age-addressBoard .age-addrLink{
-      margin:-4px -8px;
-      padding:6px 8px;
-    }
+    .age-addressBoard .age-addrLink{ margin:-4px -8px; padding:6px 8px; }
 
+    /* ✅ one row, no scrollbar */
     .age-social{
       display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; align-items:center;
       max-width:100%; overflow:visible; -ms-overflow-style:none; scrollbar-width:none;
@@ -512,10 +544,7 @@ const year = new Date().getFullYear();
       background:rgba(255,255,255,.06);
       transition:transform .15s ease, box-shadow .2s ease, background .2s;
     }
-    .age-socialBtn i,
-    .age-socialBtn svg{
-      font-size:20px; width:20px; height:20px; line-height:1;
-    }
+    .age-socialBtn svg{ width:20px; height:20px; }
     .age-socialBtn:hover{
       transform:translateY(-3px);
       background:linear-gradient(180deg,rgba(255,255,255,.18),rgba(255,255,255,.08));
@@ -530,7 +559,6 @@ const year = new Date().getFullYear();
     .age-topbar{ width:72px; height:3px; border-radius:3px; background:linear-gradient(90deg,var(--BRAND_BLUE),var(--BRAND_GOLD)); opacity:.9; }
     .age-copy{ margin:0; color:var(--TEXT_SOFT); font-size:14.5px; letter-spacing:.25px; }
     .age-copy strong{ color:var(--TEXT_MAIN); font-weight:700; }
-    .age-dot{ margin:0 10px; color:rgba(255,255,255,.45); }
 
     .age-trust{ display:flex; gap:10px; margin-top:2px; flex-wrap:wrap; justify-content:center; }
     .age-trustCard{
@@ -543,25 +571,18 @@ const year = new Date().getFullYear();
     .age-trustCard:hover{ transform:translateY(-2px); box-shadow:0 10px 22px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.85); }
     .age-trustCard img{ max-height:36px; filter:grayscale(.05) saturate(.95) contrast(1.05); }
     .age-trustCard:hover img{ filter:grayscale(0) saturate(1.2) contrast(1.1); }
-    
-    .newsletter-message {
-      font-size: 14px;
-      padding: 8px 12px;
-      border-radius: 4px;
-      text-align: center;
-    }
-    
+
     /* Beautiful Toast Notification Styles */
     .newsletter-toast {
       position: fixed;
       bottom: 20px;
       right: 20px;
-      background: #10B981; /* Green color for success */
+      background: #10B981;
       color: white;
       padding: 16px 24px;
       border-radius: 12px;
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-      display: none; /* Hidden by default */
+      display: none;
       align-items: center;
       z-index: 1000;
       transform: translateY(100px);
@@ -569,26 +590,14 @@ const year = new Date().getFullYear();
       transition: all 0.3s ease;
       max-width: 400px;
     }
-    
     .newsletter-toast.show {
-      display: flex !important; /* Ensure it displays when shown */
+      display: flex !important;
       transform: translateY(0);
       opacity: 1;
     }
-    
-    .newsletter-toast.error {
-      background: #EF4444; /* Red color for errors */
-    }
-    
-    .newsletter-toast-content {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    
-    .newsletter-toast-content svg {
-      flex-shrink: 0;
-    }
+    .newsletter-toast.error { background: #EF4444; }
+    .newsletter-toast-content { display: flex; align-items: center; gap: 12px; }
+    .newsletter-toast-content svg { flex-shrink: 0; }
 
     @media (max-width:991px){
       .age-title{ font-size:18px; }
@@ -600,13 +609,8 @@ const year = new Date().getFullYear();
       .age-trustCard img{ max-height:30px; }
       .age-addrLink{ padding:6px 10px; margin:-6px -10px; }
     }
-
-    /* EXTRA LEFT/RIGHT SPACE ON MOBILE */
     @media (max-width:640px){
-      .age-container{
-        padding-left:24px;
-        padding-right:24px;
-      }
+      .age-container{ padding-left:24px; padding-right:24px; }
     }
 
     :global(.theme-dark) .age-footer{
@@ -614,117 +618,122 @@ const year = new Date().getFullYear();
       --TEXT_SOFT: rgba(231,237,246,.78);
     }
   </style>
-  <script is:inline type="module">
-    document.addEventListener('DOMContentLoaded', function() {
-      const newsletterForm = document.getElementById('newsletterForm');
-      const newsletterEmail = document.getElementById('newsletterEmail');
-      const newsletterToast = document.getElementById('newsletterToast');
-      const toastMessage = document.getElementById('toastMessage');
-      
-      if (newsletterForm) {
-        newsletterForm.addEventListener('submit', async function(e) {
-          // Prevent page refresh
-          e.preventDefault();
-          e.stopPropagation();
-          
-          const email = newsletterEmail.value.trim();
-          if (!email) return;
-          
-          // Show loading state
-          const submitButton = newsletterForm.querySelector('button');
-          const originalButtonText = submitButton.innerHTML;
-          submitButton.innerHTML = '...';
-          submitButton.disabled = true;
-          
-          try {
-            // Get API base URL from environment
-            const API_BASE = (window?.env?.PUBLIC_API_BASE_URL || 'https://test.amrita-fashions.com').replace(/\/+$/, '');
-            const API_KEY = window?.env?.PUBLIC_API_KEY;
-            const API_KEY_HEADER = window?.env?.PUBLIC_API_KEY_HEADER || 'x-api-key';
-            const ADMIN_EMAIL = window?.env?.PUBLIC_ADMIN_EMAIL;
-            const ADMIN_EMAIL_HEADER = window?.env?.PUBLIC_ADMIN_EMAIL_HEADER || 'x-admin-email';
-            
-            // Prepare payload for newsletter subscription - matching the API format
-            const payload = {
-              email: email,
-              contactPerson: 'Newsletter Subscriber',
-              phoneNumber: '',
-              businessType: '',
-              annualFabricVolume: '',
-              primaryMarkets: '',
-              fabricTypesOfInterest: [],
-              specificationsRequirements: '',
-              timeline: '',
-              additionalMessage: 'Subscribed to newsletter',
-              companyName: ''
-            };
-            
-            // Submit to contact API
-            const headers = {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            };
-            if (API_KEY) headers[API_KEY_HEADER] = API_KEY;
-            if (ADMIN_EMAIL) headers[ADMIN_EMAIL_HEADER] = ADMIN_EMAIL;
 
-            const response = await fetch(`${API_BASE}/contacts`, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify(payload)
-            });
-            
-            if (response.ok) {
-              const responseData = await response.json();
-              if (responseData.success) {
-                // Success - show beautiful toast notification
-                showToast('Thank you for subscribing to our newsletter!', 'success');
-                newsletterForm.reset();
-              } else {
-                throw new Error(responseData.message || 'Failed to subscribe');
-              }
-            } else {
-              throw new Error('Failed to connect to server');
-            }
-          } catch (error) {
-            // Handle error - show error toast
-            showToast(error.message || 'Something went wrong. Please try again.', 'error');
-          } finally {
-            // Reset button
-            submitButton.innerHTML = originalButtonText;
-            submitButton.disabled = false;
-          }
-          
-          // Return false to ensure no form submission happens
-          return false;
-        });
+  <script is:inline type="module">
+    document.addEventListener("DOMContentLoaded", function () {
+      const newsletterForm = document.getElementById("newsletterForm");
+      const newsletterEmail = document.getElementById("newsletterEmail");
+      const newsletterToast = document.getElementById("newsletterToast");
+      const toastMessage = document.getElementById("toastMessage");
+
+      function readEnv() {
+        const w = typeof window !== "undefined" ? window : {};
+        const env = (w.env && typeof w.env === "object") ? w.env : {};
+
+        const rawBase = String(env.PUBLIC_API_BASE_URL || "").replace(/\/+$/, "");
+        // safer fallback (most of your endpoints are under /api)
+        let base = rawBase || "https://test.amrita-fashions.com/api";
+
+        // if someone set only domain (no /api), append /api
+        try {
+          const u = new URL(base);
+          if (u.pathname === "/" || u.pathname === "") base = base.replace(/\/+$/, "") + "/api";
+        } catch(_) {}
+
+        return {
+          API_BASE: base.replace(/\/+$/, ""),
+          API_KEY: env.PUBLIC_API_KEY || "",
+          API_KEY_HEADER: env.PUBLIC_API_KEY_HEADER || "x-api-key",
+          ADMIN_EMAIL: env.PUBLIC_ADMIN_EMAIL || "",
+          ADMIN_EMAIL_HEADER: env.PUBLIC_ADMIN_EMAIL_HEADER || "x-admin-email",
+        };
       }
-      
-      // Function to show beautiful toast notification
+
       function showToast(message, type) {
         if (!newsletterToast || !toastMessage) return;
-        
-        // Set message
+
         toastMessage.textContent = message;
-        
-        // Set type class
-        newsletterToast.className = 'newsletter-toast';
-        if (type === 'error') {
-          newsletterToast.classList.add('error');
-        }
-        
-        // Show toast with proper display
-        newsletterToast.style.display = 'flex';
-        // Trigger reflow to ensure the transition works
-        newsletterToast.offsetHeight;
-        newsletterToast.classList.add('show');
-        
-        // Hide toast after 5 seconds
+
+        newsletterToast.className = "newsletter-toast";
+        if (type === "error") newsletterToast.classList.add("error");
+
+        newsletterToast.style.display = "flex";
+        newsletterToast.offsetHeight; // reflow
+        newsletterToast.classList.add("show");
+
         setTimeout(() => {
-          newsletterToast.classList.remove('show');
-          setTimeout(() => {
-            newsletterToast.style.display = 'none';
-          }, 300);
+          newsletterToast.classList.remove("show");
+          setTimeout(() => { newsletterToast.style.display = "none"; }, 300);
         }, 5000);
+      }
+
+      if (newsletterForm) {
+        newsletterForm.addEventListener("submit", async function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+
+          const email = String(newsletterEmail?.value || "").trim();
+          if (!email) return;
+
+          const submitButton = newsletterForm.querySelector("button");
+          const originalButtonHTML = submitButton ? submitButton.innerHTML : "";
+          if (submitButton) {
+            submitButton.innerHTML = "...";
+            submitButton.disabled = true;
+          }
+
+          try {
+            const ENV = readEnv();
+
+            const payload = {
+              email,
+              contactPerson: "Newsletter Subscriber",
+              phoneNumber: "",
+              businessType: "",
+              annualFabricVolume: "",
+              primaryMarkets: "",
+              fabricTypesOfInterest: [],
+              specificationsRequirements: "",
+              timeline: "",
+              additionalMessage: "Subscribed to newsletter",
+              companyName: "",
+            };
+
+            const headers = {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            };
+
+            if (ENV.API_KEY) headers[ENV.API_KEY_HEADER] = ENV.API_KEY;
+            if (ENV.ADMIN_EMAIL) headers[ENV.ADMIN_EMAIL_HEADER] = ENV.ADMIN_EMAIL;
+
+            const res = await fetch(`${ENV.API_BASE}/contacts`, {
+              method: "POST",
+              headers,
+              body: JSON.stringify(payload),
+            });
+
+            const ct = (res.headers.get("content-type") || "").toLowerCase();
+            const data = ct.includes("application/json") ? await res.json().catch(() => ({})) : {};
+
+            if (res.ok && (data?.success === true || data?.success === undefined)) {
+              showToast("Thank you for subscribing to our newsletter!", "success");
+              newsletterForm.reset();
+            } else {
+              const msg = data?.message || `Failed to subscribe (status ${res.status})`;
+              throw new Error(msg);
+            }
+          } catch (err) {
+            showToast(err?.message || "Something went wrong. Please try again.", "error");
+          } finally {
+            if (submitButton) {
+              submitButton.innerHTML = originalButtonHTML;
+              submitButton.disabled = false;
+            }
+          }
+
+          return false;
+        });
       }
     });
   </script>

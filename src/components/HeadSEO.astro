@@ -1,8 +1,9 @@
 ---
 /**
+ * HeadSEO.astro
  * Prints ONLY extra SEO meta/link tags from:
  * - Page-level seo (from SEO APIs / product×location API)
- * - Global defaultSeo (from /api/defaultseo)
+ * - Global defaultSeo (from /defaultseo)
  *
  * It deliberately does NOT output:
  * - <title>
@@ -20,75 +21,11 @@ interface Props {
 
 const { seo = null, canonical } = Astro.props as Props;
 
-/* ========= Default SEO API ========= */
-
-const API_BASE = import.meta.env.PUBLIC_API_BASE_URL;
-const DEFAULT_SEO_API = `${API_BASE}/defaultseo`;
-
-let defaultSeo: Record<string, any> | null = null;
-
-try {
-  console.log("[HeadSEO] Attempting to fetch default SEO from:", DEFAULT_SEO_API);
-  const res = await fetch(DEFAULT_SEO_API, {
-    headers: { accept: "application/json" },
-  });
-
-  console.log("[HeadSEO] Default SEO response status:", res.status);
-  if (res.ok) {
-    const json = await res.json();
-    console.log("[HeadSEO] Default SEO response data:", json);
-
-    if (Array.isArray(json) && json.length > 0) {
-      defaultSeo = json[0];
-    } else if (Array.isArray((json as any)?.data) && (json as any).data.length > 0) {
-      defaultSeo = (json as any).data[0];
-    } else {
-      defaultSeo = json;
-    }
-    console.log("[HeadSEO] Processed defaultSeo:", defaultSeo);
-  } else {
-    console.error("[HeadSEO] Failed to fetch default SEO, status:", res.status);
-  }
-} catch (error) {
-  console.error("[HeadSEO] Error fetching default SEO:", error);
-  defaultSeo = null;
-}
-
-/* ========= Office Information API (for GA and Clarity IDs) ========= */
-
-let officeInfo: Record<string, any> | null = null;
-
-try {
-  if (API_BASE) {
-    console.log("[HeadSEO] Attempting to fetch office information");
-    const response = await apiGet("officeinformation");
-    console.log("[HeadSEO] Office info response status:", response.status);
-    if (response.ok) {
-      const json = await response.json();
-      console.log("[HeadSEO] Office info response data:", json);
-      officeInfo = Array.isArray((json as any)?.data) && (json as any).data.length > 0 ? (json as any).data[0] : null;
-      console.log("[HeadSEO] Processed officeInfo:", officeInfo);
-      console.log("[HeadSEO] officeInfo.gaId:", officeInfo?.gaId);
-      console.log("[HeadSEO] officeInfo.gaid:", officeInfo?.gaid);
-      console.log("[HeadSEO] officeInfo.clarityId:", officeInfo?.clarityId);
-      console.log("[HeadSEO] officeInfo.clarityid:", officeInfo?.clarityid);
-    } else {
-      console.error("[HeadSEO] Failed to fetch office info, status:", response.status);
-    }
-  } else {
-    console.warn("[HeadSEO] API_BASE is not defined");
-  }
-} catch (error) {
-  console.error("[HeadSEO] Error fetching office info:", error);
-  officeInfo = null;
-}
-
 /* ========= Helpers ========= */
 
 const asText = (v: any) => {
   if (v === null || v === undefined) return "";
-  const s = String(v).trim();
-  return s;
+  return String(v).trim();
 };
 
 const asNumber = (value: any) => {
@@ -100,10 +37,8 @@ const asNumber = (value: any) => {
  * Pick a value only from API sources:
  * 1) page-level seo object
  * 2) defaultSeo object
- *
- * No hard-coded strings are used.
  */
-const pickSeo = (...keys: string[]) => {
+const pickSeo = (defaultSeo: any, ...keys: string[]) => {
   for (const key of keys) {
     const v = (seo as any)?.[key];
     if (v !== undefined && v !== null && String(v).trim() !== "") return v;
@@ -115,66 +50,133 @@ const pickSeo = (...keys: string[]) => {
   return undefined;
 };
 
+/* ========= Default SEO API (FIXED: uses apiGet => sends auth headers) ========= */
+
+let defaultSeo: Record<string, any> | null = null;
+
+try {
+  const res = await apiGet("defaultseo", { cache: "no-store" });
+
+  if (res.ok) {
+    const json = await res.json();
+
+    // Support common shapes:
+    // 1) [ {...} ]
+    // 2) { data: [ {...} ] }
+    // 3) { data: {...} }
+    // 4) { ... }
+    if (Array.isArray(json) && json.length > 0) {
+      defaultSeo = json[0];
+    } else if (Array.isArray((json as any)?.data) && (json as any).data.length > 0) {
+      defaultSeo = (json as any).data[0];
+    } else if ((json as any)?.data && typeof (json as any).data === "object") {
+      defaultSeo = (json as any).data;
+    } else if (json && typeof json === "object") {
+      defaultSeo = json;
+    } else {
+      defaultSeo = null;
+    }
+  } else {
+    console.error("[HeadSEO] Failed to fetch default SEO, status:", res.status);
+    defaultSeo = null;
+  }
+} catch (error) {
+  console.error("[HeadSEO] Error fetching default SEO:", error);
+  defaultSeo = null;
+}
+
+/* ========= Office Information API (for GA and Clarity IDs) ========= */
+
+let officeInfo: Record<string, any> | null = null;
+
+try {
+  const response = await apiGet("officeinformation", { cache: "no-store" });
+
+  if (response.ok) {
+    const json = await response.json();
+
+    // Support shapes:
+    // 1) { data: [ {...} ] }
+    // 2) [ {...} ]
+    // 3) { ... }
+    if (Array.isArray((json as any)?.data) && (json as any).data.length > 0) {
+      officeInfo = (json as any).data[0];
+    } else if (Array.isArray(json) && json.length > 0) {
+      officeInfo = json[0];
+    } else if (json && typeof json === "object") {
+      officeInfo = json;
+    } else {
+      officeInfo = null;
+    }
+  } else {
+    console.error("[HeadSEO] Failed to fetch office info, status:", response.status);
+    officeInfo = null;
+  }
+} catch (error) {
+  console.error("[HeadSEO] Error fetching office info:", error);
+  officeInfo = null;
+}
+
 /* ========= Resolved meta values (APIs only) ========= */
 
-const title = asText(pickSeo("title"));
-const description = asText(pickSeo("description"));
+const title = asText(pickSeo(defaultSeo, "title"));
+const description = asText(pickSeo(defaultSeo, "description"));
 
-const keywords = asText(pickSeo("keywords"));
-const robots = asText(pickSeo("robots"));
+const keywords = asText(pickSeo(defaultSeo, "keywords"));
+const robots = asText(pickSeo(defaultSeo, "robots"));
 
-const author = asText(pickSeo("author_name", "authorname"));
+const author = asText(pickSeo(defaultSeo, "author_name", "authorname"));
 
-const siteName = asText(pickSeo("ogSiteName", "ogsitename"));
-const ogType = asText(pickSeo("ogType", "ogtype"));
-const ogLocale = asText(pickSeo("ogLocale", "oglocale"));
+const siteName = asText(pickSeo(defaultSeo, "ogSiteName", "ogsitename"));
+const ogType = asText(pickSeo(defaultSeo, "ogType", "ogtype"));
+const ogLocale = asText(pickSeo(defaultSeo, "ogLocale", "oglocale"));
 
-const themeColor = asText(pickSeo("themeColor", "themecolor"));
-const fmtDetect = asText(pickSeo("formatDetection", "formatdetection"));
+const themeColor = asText(pickSeo(defaultSeo, "themeColor", "themecolor"));
+const fmtDetect = asText(pickSeo(defaultSeo, "formatDetection", "formatdetection"));
 
-const gVerify = asText(pickSeo("googleSiteVerification", "googlesiteverification"));
+const gVerify = asText(
+  pickSeo(defaultSeo, "googleSiteVerification", "googlesiteverification")
+);
 
-const msValidate = asText(pickSeo("msValidate", "microsofttoken"));
+const msValidate = asText(pickSeo(defaultSeo, "msValidate", "microsofttoken"));
 
-const appleStatus = asText(pickSeo("appleStatusBarStyle", "applestatusbarstyle"));
+const appleStatus = asText(
+  pickSeo(defaultSeo, "appleStatusBarStyle", "applestatusbarstyle")
+);
 
-const mobileCap = asText(pickSeo("mobileWebAppCapable", "mobilewebappcapable"));
+const mobileCap = asText(
+  pickSeo(defaultSeo, "mobileWebAppCapable", "mobilewebappcapable")
+);
 
 /* Twitter */
-const twitterCard = asText(pickSeo("twitterCard", "twittercard"));
-const twitterSite = asText(pickSeo("twitterSite", "twittersite"));
+const twitterCard = asText(pickSeo(defaultSeo, "twitterCard", "twittercard"));
+const twitterSite = asText(pickSeo(defaultSeo, "twitterSite", "twittersite"));
 
-/**
- * For Twitter title/description:
- * - Prefer dedicated twitterTitle/twitterDescription if present.
- * - If not, fall back to title/description that also came from APIs.
- */
-const rawTwitterTitle = pickSeo("twitterTitle", "twittertitle");
+const rawTwitterTitle = pickSeo(defaultSeo, "twitterTitle", "twittertitle");
 const twitterTitle = asText(rawTwitterTitle ?? title);
 
-const rawTwitterDesc = pickSeo("twitterDescription", "twitterdescription");
+const rawTwitterDesc = pickSeo(defaultSeo, "twitterDescription", "twitterdescription");
 const twitterDesc = asText(rawTwitterDesc ?? description);
 
-const twitterPlayer = asText(pickSeo("twitterPlayer", "twitterplayer"));
-
-const tpW = asNumber(pickSeo("twitterPlayerWidth", "twitterplayerwidth"));
-const tpH = asNumber(pickSeo("twitterPlayerHeight", "twitterplayerheight"));
+const twitterPlayer = asText(pickSeo(defaultSeo, "twitterPlayer", "twitterplayer"));
+const tpW = asNumber(pickSeo(defaultSeo, "twitterPlayerWidth", "twitterplayerwidth"));
+const tpH = asNumber(pickSeo(defaultSeo, "twitterPlayerHeight", "twitterplayerheight"));
 
 /* OG video */
-const ogVideoType = asText(pickSeo("ogVideoType", "ogvideotype"));
-const ogVideoW = asNumber(pickSeo("ogVideoWidth", "ogvideowidth"));
-const ogVideoH = asNumber(pickSeo("ogVideoHeight", "ogvideoheight"));
+const ogVideoType = asText(pickSeo(defaultSeo, "ogVideoType", "ogvideotype"));
+const ogVideoW = asNumber(pickSeo(defaultSeo, "ogVideoWidth", "ogvideowidth"));
+const ogVideoH = asNumber(pickSeo(defaultSeo, "ogVideoHeight", "ogvideoheight"));
 
 /* ✅ Analytics IDs (OFFICEINFO FIRST, then fallback to SEO/default) */
 const gaCandidate =
-  officeInfo?.gaId ||
-  officeInfo?.gaid ||
-  pickSeo("gaId", "gaid");
+  (officeInfo as any)?.gaId ||
+  (officeInfo as any)?.gaid ||
+  pickSeo(defaultSeo, "gaId", "gaid");
 
 const clarityCandidate =
-  officeInfo?.clarityId ||
-  officeInfo?.clarityid ||
-  pickSeo("clarityId", "clarityid");
+  (officeInfo as any)?.clarityId ||
+  (officeInfo as any)?.clarityid ||
+  pickSeo(defaultSeo, "clarityId", "clarityid");
 
 const normalizeGaId = (v: any) => {
   const s = String(v ?? "").trim();
@@ -185,33 +187,20 @@ const normalizeClarityId = (v: any) => {
   let s = String(v ?? "").trim();
   if (!s) return null;
 
-  // if someone pasted full URL, keep only the tail
   s = s.replace(/^https?:\/\/(www\.)?clarity\.ms\/tag\//i, "");
-
-  // remove wrong prefix like "clarity-xxxxx"
   s = s.replace(/^clarity[-_]/i, "");
-
-  // keep only alphanumeric (clarity project id is simple)
   s = s.replace(/[^a-z0-9]/gi, "").toLowerCase();
 
-  // your example: t6huzv7k5g (10 chars)
   return /^[a-z0-9]{8,20}$/.test(s) ? s : null;
 };
 
 const validGaId = normalizeGaId(gaCandidate);
 const validClarityId = normalizeClarityId(clarityCandidate);
-const isValidClarityFormat = !!validClarityId;
-
-/* Debug (server-side logs) */
-console.log("[HeadSEO] gaCandidate:", gaCandidate);
-console.log("[HeadSEO] clarityCandidate:", clarityCandidate);
-console.log("[HeadSEO] validGaId:", validGaId);
-console.log("[HeadSEO] validClarityId:", validClarityId);
 
 /**
  * URL for OG/Twitter:
- * - Use canonical prop if provided (this should come from API).
- * - If not provided, we do NOT invent a URL.
+ * - Use canonical prop if provided (should come from API).
+ * - If not provided, do NOT invent a URL.
  */
 const urlForMeta = canonical && canonical.trim().length ? canonical.trim() : "";
 ---
@@ -227,10 +216,7 @@ const urlForMeta = canonical && canonical.trim().length ? canonical.trim() : "";
 {gVerify && <meta name="google-site-verification" content={gVerify} />}
 {msValidate && <meta name="msvalidate.01" content={msValidate} />}
 {appleStatus && (
-  <meta
-    name="apple-mobile-web-app-status-bar-style"
-    content={appleStatus}
-  />
+  <meta name="apple-mobile-web-app-status-bar-style" content={appleStatus} />
 )}
 {mobileCap && <meta name="mobile-web-app-capable" content={mobileCap} />}
 
@@ -243,12 +229,8 @@ const urlForMeta = canonical && canonical.trim().length ? canonical.trim() : "";
 {urlForMeta && <meta property="og:url" content={urlForMeta} />}
 
 {ogVideoType && <meta property="og:video:type" content={ogVideoType} />}
-{typeof ogVideoW === "number" && (
-  <meta property="og:video:width" content={String(ogVideoW)} />
-)}
-{typeof ogVideoH === "number" && (
-  <meta property="og:video:height" content={String(ogVideoH)} />
-)}
+{typeof ogVideoW === "number" && <meta property="og:video:width" content={String(ogVideoW)} />}
+{typeof ogVideoH === "number" && <meta property="og:video:height" content={String(ogVideoH)} />}
 
 <!-- Twitter -->
 {twitterCard && <meta name="twitter:card" content={twitterCard} />}
@@ -256,13 +238,10 @@ const urlForMeta = canonical && canonical.trim().length ? canonical.trim() : "";
 {twitterTitle && <meta name="twitter:title" content={twitterTitle} />}
 {twitterDesc && <meta name="twitter:description" content={twitterDesc} />}
 {twitterPlayer && <meta name="twitter:player" content={twitterPlayer} />}
-{typeof tpW === "number" && (
-  <meta name="twitter:player:width" content={String(tpW)} />
-)}
-{typeof tpH === "number" && (
-  <meta name="twitter:player:height" content={String(tpH)} />
-)}
+{typeof tpW === "number" && <meta name="twitter:player:width" content={String(tpW)} />}
+{typeof tpH === "number" && <meta name="twitter:player:height" content={String(tpH)} />}
 
+<!-- Google Analytics -->
 {validGaId && (
   <>
     <script async src={`https://www.googletagmanager.com/gtag/js?id=${validGaId}`}></script>
@@ -278,7 +257,8 @@ const urlForMeta = canonical && canonical.trim().length ? canonical.trim() : "";
   </>
 )}
 
-{validClarityId && isValidClarityFormat && (
+<!-- Microsoft Clarity -->
+{validClarityId && (
   <script
     is:inline
     set:html={`(function(c,l,a,r,i,t,y){
